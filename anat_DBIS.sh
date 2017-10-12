@@ -4,6 +4,8 @@
 # Purpose: Pipeline for processing T1 anatomical images for the DNS study
 # Author: Maxwell Elliott
 # Date: 2/24/17
+#		10/12/17: ARK added "GLOBAL DIRECTIVE"s to move output to subject antCT dir
+#				  ARK added unzip VBM image for use in SPM
 
 
 ###########!!!!!!!!!Pipeline to do!!!!!!!!!!!!!#############
@@ -20,6 +22,11 @@
 # Environment set up
 #
 ###############################################################################
+
+# --- BEGIN GLOBAL DIRECTIVE -- 
+#$ -o $HOME/$JOB_NAME.$JOB_ID.out
+#$ -e $HOME/$JOB_NAME.$JOB_ID.out
+# -- END GLOBAL DIRECTIVE -- 
 
 sub=$1 #$1 or flag -s  #20161103_21449 #pipenotes= Change away from HardCoding later 
 subDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
@@ -107,6 +114,7 @@ if [[ ! -f ${antDir}/${antPre}JacModVBM_blur8mm.nii.gz ]];then
 	3dcalc -a ${antDir}/${antPre}GMwarped.nii.gz -b ${antDir}/${antPre}SCwarped.nii.gz -c ${antDir}/${antPre}CBwarped.nii.gz -d ${antDir}/${antPre}BSwarped.nii.gz -e ${templateDir}/${templatePre}_blurMask25.nii.gz -expr '(a*equals(e,1)+b*equals(e,2)+c*equals(e,3)+d*equals(e,4))' -prefix ${antDir}/${antPre}noModVBM.nii.gz
 	3dBlurInMask -input ${antDir}/${antPre}JacModVBM.nii.gz -Mmask ${templateDir}/${templatePre}_blurMask25.nii.gz -FWHM 8 -prefix ${antDir}/${antPre}JacModVBM_blur8mm.nii.gz
 	3dBlurInMask -input ${antDir}/${antPre}noModVBM.nii.gz -Mmask ${templateDir}/${templatePre}_blurMask25.nii.gz -FWHM 8 -prefix ${antDir}/${antPre}noModVBM_blur8mm.nii.gz
+	gunzip ${antDir}/${antPre}JacModVBM_blur8mm.nii.gz # unzip for use in SPM
 fi
 ###Make Brain Extraction QA montages
 if [[ ! -f ${QADir}/anat.BrainExtractionCheckAxial.png ]];then
@@ -189,3 +197,7 @@ rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}Tem
 rm -r ${antDir}/tmp ${freeDir}/SUMA/FreeSurfer_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.*
 gzip ${freeDir}/SUMA/*.nii 
  
+# -- BEGIN POST-USER -- 
+echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 
+mv $HOME/$JOB_NAME.$JOB_ID.out $antDir/$JOB_NAME.$JOB_ID.out	 
+# -- END POST-USER -- 
