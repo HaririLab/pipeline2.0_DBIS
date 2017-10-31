@@ -40,8 +40,8 @@ templatePre=dunedin115template_MNI #pipenotes= update/Change away from HardCodin
 anatDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/
 flairDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_3D_SAG_FLAIR_FS-_1.2_mm/
 #T1=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
-threads=1 #default in case thread argument is not passed
 threads=$2
+if [ ${#threads} -eq 0 ]; then threads=1; fi # antsRegistrationSyN won't work properly if $threads is empty
 baseDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 export PATH=$PATH:${baseDir}/scripts/:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/huginBin/bin/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
@@ -72,8 +72,16 @@ FLAIR=${tmpDir}/flair.nii.gz
 if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];then
 	Dimon -infile_prefix ${anatDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin
 	bestT1=$(ls OutBrick_run_0* | tail -n1)
+	# check if Dimon import worked, if not try dcm2niix
+	if [ ${#bestT1} -eq 0 ]; then
+		echo "!!!!!!!!!!!!!!!!!!!! No output from Dimon t1 import, attempting with dcm2niix !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		firstDcm=$(ls ${anatDir}/1.3.12.2.1107.5.2.19* | head -1)
+		/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Scripts/Tools/mricrogl_lx/dcm2niix -o ${tmpDir} ${firstDcm}
+		gzip ${tmpDir}/MR*nii
+		bestT1=$(ls ${tmpDir}/MR*nii.gz | tail -n1)
+	fi
 	3dcopy ${bestT1} ${tmpDir}/anat.nii.gz
-	mv flair.nii.gz dimon* GERT* ${tmpDir}
+	mv flair.nii.gz dimon* GERT* ${tmpDir} 
 	mv OutBrick* ${tmpDir}
 	sizeT1=$(@GetAfniRes ${T1})
 	echo $sizeT1
@@ -193,9 +201,9 @@ else
 fi
 #cleanup
 #mv highRes_* antCT/ #pipeNotes: add more deletion and clean up to minimize space, think about deleting Freesurfer and some of SUMA output
-rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject* ${subDir}/dimon.files* ${subDir}/GERT_Reco* ${antDir}/tmp
-rm -r ${antDir}/tmp ${freeDir}/SUMA/FreeSurfer_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.*
-gzip ${freeDir}/SUMA/*.nii 
+# # rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject* ${subDir}/dimon.files* ${subDir}/GERT_Reco* ${antDir}/tmp
+# # rm -r ${antDir}/tmp ${freeDir}/SUMA/FreeSurfer_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.*
+# # gzip ${freeDir}/SUMA/*.nii 
  
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 
