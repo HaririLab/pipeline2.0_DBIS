@@ -24,6 +24,10 @@
 #2) Re-test alignment with EPI, may be alternate optimized parameters
 #3) Bo unwarping, consider using epi_reg approach https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=fsl;6b6c4ba1.1404
 
+# --- BEGIN GLOBAL DIRECTIVE -- 
+#$ -o $HOME/$JOB_NAME.$JOB_ID.out
+#$ -e $HOME/$JOB_NAME.$JOB_ID.out
+# -- END GLOBAL DIRECTIVE -- 
 
 sub=$1 #$1 or flag -s  #20161103_21449 #pipenotes= Change away from HardCoding later 
 task=$2
@@ -39,6 +43,15 @@ templatePre=dunedin115template_MNI_ #pipenotes= update/Change away from HardCodi
 #T1=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
 threads=1 #default in case thread argument is not passed
 threads=$3
+
+
+# # ##Make sure anatomical has been run
+# # if [ ! -e ${antDir}/${antPre}BrainSegmentation.nii.gz ]; then
+	# # echo "#########################################################################################################"
+	# # echo "###################### Processed anatomical not found, running anat_DBIS.sh #############################"
+	# # echo "#########################################################################################################"
+	# # sh /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Scripts/NewPipeline/anat_DBIS.sh $sub 1
+# # fi
 
 ##Grab Epi and set up directories
 
@@ -64,9 +77,8 @@ else
 		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 		exit
 fi
-fieldMapDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_gre_field_mapping_2mm/baseDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-export PATH=$PATH:${baseDir}/baseDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-export PATH=$PATH:${baseDir}/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
+fieldMapDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_gre_field_mapping_2mm/
+export PATH=$PATH:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/Pipelines/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
 export OMP_NUM_THREADS=$threads
 ##Set up directory
@@ -90,11 +102,33 @@ lenEpi=$(3dinfo -nv ${tmpDir}/epi.nii.gz)
 if [[ $lenEpi == $expLen || $lenEpi == $expLen2 ]];then
 	echo "Epi matches the assumed length"
 else
-	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EPI is the Wrong Size, wrong number of slices!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-	exit
+	# check if this run was stopped and restarted, in which case teh GERT script will have 2 instances of "epi.nii.gz", and we can just edit it to be able to pull the latter
+	cd $tmpDir
+	runCt=`grep epi.nii.gz GERT_Reco_dicom | wc -l`;
+	if [[ $runCt == 2 ]]; then 
+		# need to edit the GERT_Reco script so that the two runs go to dif file names
+		sed -i '0,/epi.nii.gz/{s/epi.nii.gz/epi1.nii.gz/}' GERT_Reco_dicom; # change first instance
+		sed -i '0,/epi.nii.gz/{s/epi.nii.gz/epi2.nii.gz/}' GERT_Reco_dicom; # change second instance
+		sh GERT_Reco_dicom # now run Reco
+		lenEpi2=$(3dinfo -nv epi2.nii.gz)
+		if [[ $lenEpi2 == $expLen || $lenEpi2 == $expLen2 ]];then
+			echo "!!!!!!!!!!!!!!! Epi appears to have been re-run, and second run matches the assumed length. Proceeding !!!!!!!!!!!!"
+			mv epi2.nii.gz epi.nii.gz 
+			cd $outDir
+		else
+			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+			echo "!!!!!!!!!! EPI has wrong number of TRs! Detected 2 runs of length $lenEpi and $lenEpi2 !!!!!!!!!!!!!!!!!!!!!!!!"
+			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+			exit
+		fi
+	else
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		echo "!!!!!!!!!!!!!!! EPI has wrong number of TRs! Detected $runCt runs, first is length $lenEpi !!!!!!!!!!!!!!!!!!!!"
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"	
+		exit
+	fi
 fi
 
 echo ""
@@ -249,6 +283,16 @@ CreateTiledMosaic -i ${tmpDir}/epiPostb0.nii.gz -r ${tmpDir}/epiPostb0.nii.gz -o
 
 ##Clean up
 rm -r $tmpDir
+
+##run first level model
+if [ $task != "rest" ]; then
+	qsub /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Scripts/NewPipeline/run_firstlevel_AFNI_$task.bash $sub
+fi
+
+# -- BEGIN POST-USER -- 
+echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 
+mv $HOME/$JOB_NAME.$JOB_ID.out $outDir/$JOB_NAME.$JOB_ID.out	 
+# -- END POST-USER -- 
 
 
 ##########Citations
