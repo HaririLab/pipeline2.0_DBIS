@@ -31,6 +31,7 @@
 
 sub=$1 #$1 or flag -s  #20161103_21449 #pipenotes= Change away from HardCoding later 
 task=$2
+scriptDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
 subDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
 QADir=${subDir}/QA
 outDir=${subDir}/${task}
@@ -41,8 +42,8 @@ antPre="highRes_"
 templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/DBIS115 #pipenotes= update/Change away from HardCoding later
 templatePre=dunedin115template_MNI_ #pipenotes= update/Change away from HardCoding later
 #T1=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
-threads=1 #default in case thread argument is not passed
 threads=$3
+if [ ${#threads} -eq 0 ]; then threads=1; fi 
 
 
 # # ##Make sure anatomical has been run
@@ -149,9 +150,8 @@ echo "##########################################################################
 echo ""
 
 #gunzip ${tmpDir}/epi_dt.nii.gz
-mscriptDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Scripts/NewPipeline
 # Loop through template MATLAB script replacing keywords
-for i in ${mscriptDir}'/spm_fieldmap.m'; do
+for i in ${scriptDir}'/spm_fieldmap.m'; do
 sed -e 's@SUB_SUBJECT_SUB@'$sub'@g' \
 	-e 's@SUB_NUMTRS_SUB@'$expLen'@g' \
 	-e 's@SUB_TASK_SUB@'$task'@g' <$i> spm_fieldmap.m
@@ -282,11 +282,11 @@ CreateTiledMosaic -i ${tmpDir}/epiPreb0.nii.gz -r ${tmpDir}/epiPreb0.nii.gz -o $
 CreateTiledMosaic -i ${tmpDir}/epiPostb0.nii.gz -r ${tmpDir}/epiPostb0.nii.gz -o ${QADir}/${task}.postB0.png -a 0 -t -1x-1 -d 2 -p mask -s [15,0,120] -x ${tmpDir}/epiPostb0.nii.gz -f 0x1 -p 0
 
 ##Clean up
-rm -r $tmpDir
+# rm -r $tmpDir
 
 ##run first level model
 if [ $task != "rest" ]; then
-	qsub /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Scripts/NewPipeline/run_firstlevel_AFNI_$task.bash $sub
+	qsub $scriptDir/glm_$task.bash $sub
 fi
 
 # -- BEGIN POST-USER -- 
