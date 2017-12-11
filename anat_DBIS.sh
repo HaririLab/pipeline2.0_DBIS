@@ -39,10 +39,12 @@ templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/
 templatePre=dunedin115template_MNI #pipenotes= update/Change away from HardCoding later
 anatDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/
 flairDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_3D_SAG_FLAIR_FS-_1.2_mm/
+graphicsDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Graphics/Brain_Images/ReadyToProcess/
 #T1=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
 threads=$2
 if [ ${#threads} -eq 0 ]; then threads=1; fi # antsRegistrationSyN won't work properly if $threads is empty
-baseDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# baseDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+baseDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
 export PATH=$PATH:${baseDir}/scripts/:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/huginBin/bin/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
 export OMP_NUM_THREADS=$threads
@@ -110,7 +112,7 @@ else
 fi
 ##Smooth Cortical Thickness for 2nd level
 if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate_blur8mm.nii.gz ]];then
-	3dBlurInMask -input ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz -mask ${templateDir}/${templatePre}AvgGMSegWarped25connected.nii.gz -FWHM 8 -prefix ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate_blur8mm.nii.gz
+	3dBlurInMask -input ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz -mask ${templateDir}/${templatePre}_AvgGMSegWarped25connected.nii.gz -FWHM 8 -prefix ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate_blur8mm.nii.gz
 fi
 ###Make VBM and smooth
 if [[ ! -f ${antDir}/${antPre}JacModVBM_blur8mm.nii.gz ]];then
@@ -199,11 +201,50 @@ else
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!Skipping SUMA_Make_Spec, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	echo ""
 fi
+### Prep images to send to subjects
+found=$(grep $sub $graphicsDir/finished_processing.txt | wc -l);
+if [ $found -eq 0 ]; then
+	mkdir -p $graphicsDir/$sub/uncropped_T1/front;
+	mkdir -p $graphicsDir/$sub/uncropped_T1/top;
+	mkdir -p $graphicsDir/$sub/uncropped_T1/side;
+	mkdir -p $graphicsDir/$sub/MoreImages_3D;
+	mv ${antDir}/tmp/anat.nii.gz $graphicsDir/$sub/HighRes.nii.gz 
+	cp ${antDir}/${antPre}ExtractedBrain0N4.nii.gz $graphicsDir/$sub/c1HighRes.nii.gz 
+fi
+### Add freesurfer values to Master files
+MasterDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/testing2/
+found=$(grep $sub $MasterDir/FreeSurfer_aparc.a2009s_GrayVol.csv | wc -l);
+if [ $found -eq 0 ]; then
+	for f in `ls $freeDir/stats/lh*aparc*stats`; do
+		measures=`grep "ColHeaders" $f`;
+		fname=${f/$freeDir\/stats\//}
+		fname_short=${fname/lh./}
+		i=1; 
+		for measure in $measures; do 
+			if [[ $i > 3 ]]; then # first three measure labels are #, ColHeaders, and Structname
+				col=$((i-2)); 
+				vals_L=`grep -v "#" $freeDir/stats/${fname} | awk -v colnum=$col '{print $colnum}'`; 
+				vals_R=`grep -v "#" $freeDir/stats/${fname/lh/rh} | awk -v colnum=$col '{print $colnum}'`; 
+				str_L=$(echo $sub,$vals_L | sed 's/ /,/g')
+				str_R=$(echo $vals_R | sed 's/ /,/g')
+				echo $str_L,$str_R	>> ${MasterDir}FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
+			fi; 
+			i=$((i+1)); 
+		done
+	done	
+fi
 #cleanup
 #mv highRes_* antCT/ #pipeNotes: add more deletion and clean up to minimize space, think about deleting Freesurfer and some of SUMA output
-# # rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject* ${subDir}/dimon.files* ${subDir}/GERT_Reco* ${antDir}/tmp
-# # rm -r ${antDir}/tmp ${freeDir}/SUMA/FreeSurfer_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.*
-# # gzip ${freeDir}/SUMA/*.nii 
+rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject* ${subDir}/dimon.files* ${subDir}/GERT_Reco* ${antDir}/tmp
+rm -r ${antDir}/tmp ${freeDir}/SUMA/FreeSurfer_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.*
+gzip ${freeDir}/SUMA/*.nii 
+
+### Now run EPI preprocessing
+qsub $baseDir/epi_minProc_DBIS.sh $sub faces 1
+qsub $baseDir/epi_minProc_DBIS.sh $sub stroop 1
+qsub $baseDir/epi_minProc_DBIS.sh $sub mid 1
+qsub $baseDir/epi_minProc_DBIS.sh $sub facename 1
+qsub $baseDir/epi_minProc_DBIS.sh $sub rest 1
  
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 
