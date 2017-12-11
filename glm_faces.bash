@@ -6,58 +6,40 @@
 #$ -e $HOME/$JOB_NAME.$JOB_ID.out
 # -- END GLOBAL DIRECTIVE -- 
 
-EXPERIMENT=`biacmount DBIS.01`
-
-# index=${SGE_TASK_ID}
-OUTDIR=$EXPERIMENT/Analysis/All_Imaging/
+BASEDIR=`biacmount DBIS.01`
+OUTDIR=$BASEDIR/Analysis/All_Imaging/
+BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/DBIS_BEHAVIORAL_faces.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI_splitRuns
 
 SUBJ=$1
-firstDigit=$(echo $SUBJ | cut -c6)
-if [ $firstDigit -eq 2 ]; then # this is a retest scan
-	EXAMID=$(echo $SUBJ | cut -c6-10)
-else
-	EXAMID=$(echo $SUBJ | cut -c6-9)
-fi
 
-###### Get faces order ######
+###### Read behavioral data ######
+SUBJ_NUM=$(echo $SUBJ | cut -c6-)
+if [ -e $BASEDIR/Data/Behavioral/Matching/Matching-$SUBJ_NUM.txt ]; then
+	perl $BASEDIR/Scripts/Behavioral/getFacesEprime.pl $BASEDIR/Data/Behavioral/Matching/Matching-$SUBJ_NUM.txt $OUTDIR/$SUBJ/faces
+else
+	if [ -e $BASEDIR/Data/Behavioral/Matching/Matching-${SUBJ_NUM:1:3}.txt ]; then
+		perl $BASEDIR/Scripts/Behavioral/getFacesEprime.pl $BASEDIR/Data/Behavioral/Matching/Matching-${SUBJ_NUM:1:3}.txt $OUTDIR/$SUBJ/faces
+	else
+		echo "***Can't locate Matching eprime txt file ($BASEDIR/Data/Behavioral/Matching/Matching-$SUBJ_NUM.txt or $BASEDIR/Data/Behavioral/Matching/Matching-${SUBJ_NUM:1:3}.txt). Faces will not be run!***";
+		exit 32;
+	fi	
+fi
+# write response data summary stats to master file
+found=$(grep $SUBJ $BehavioralFile | wc -l)
+if [ $found -eq 0 ]; then
+	vals=`awk '{print $2}' $OUTDIR/$SUBJ/faces/ResponseData.txt`
+	echo .,$vals | sed 's/ /,/g' >> $BehavioralFile
+fi
+# Get faces order 
 if [ $SUBJ -eq DMHDS0339 ]; then # this sub's eprime file was accidentally overwritten with one having the wrong order 
 	FACESORDER=1; 
 else	
-	eprimeFile=`ls $EXPERIMENT/Data/Behavioral/Matching/Matching-$EXAMID.txt 2> /dev/null`;
-	if [[ $eprimeFile ]]; then
-		echo "Reading order number from $eprimeFile"
-	else
-		echo "***Could not find $EXPERIMENT/Data/Behavioral/Matching/Matching-$EXAMID.txt, trying -${EXAMID:1:3}.txt instead***";
-		fileCount=`ls $EXPERIMENT/Data/Behavioral/Matching/Matching-${EXAMID:1:3}.txt 2> /dev/null | wc -l`;
-		if [ $fileCount -eq 1 ]; then
-			eprimeFile=`ls $EXPERIMENT/Data/Behavioral/Matching/Matching-${EXAMID:1:3}.txt 2> /dev/null`;
-			echo "***Found it! $eprimeFile***"
-		else
-			echo "***Error: could not find eprime file to get faces order, quitting!!! (Check Data/Behavioral/Matching or consider changing input variables to use manual faces order)***"
-			exit 32
-		fi
-	fi
-	# order number is stored in ListChoice variable
-	FACESORDER=`grep "ListChoice" $eprimeFile | head -n 1 | awk '{print $2}'`
-	if [[ $FACESORDER ]]; then
-		echo "***Faces order is $FACESORDER***"
-	else
-		echo "***Attempting to convert $eprimeFile****"
-		iconv -f utf-16 -t utf-8 $eprimeFile > $EXPERIMENT/Data/Behavioral/tmp_$SUBJ.txt
-		FACESORDER=`grep "ListChoice" $EXPERIMENT/Data/Behavioral/tmp_$SUBJ.txt | head -n 1 | awk '{print $2}'`
-		FACESORDER=$(echo $FACESORDER | cut -c1-1) # just take first character, looks like from the above command it extracts 2 chars including some whitespace char
-		rm $EXPERIMENT/Data/Behavioral/tmp_$SUBJ.txt
-		if [[ $FACESORDER ]]; then
-			echo "***Faces order is $FACESORDER***"
-		else
-			echo "***Error: could not read faces order from $eprimeFile, quitting!!! (consider changing input variables to use manual faces order)***"
-			exit 32
-		fi
-	fi
+	FACESORDER=$(grep Order $OUTDIR/$SUBJ/faces/ResponseData.txt | cut -d" " -f2)
 fi
-
+echo "***Faces order is $FACESORDER***"
+			
 rm -r $OUTDIR/$SUBJ/faces/$runname
 mkdir -p $OUTDIR/$SUBJ/faces/$runname/contrasts
 
@@ -80,7 +62,7 @@ head -185 $OUTDIR/$SUBJ/faces/$runname/outliers.1D | tail -43 > $OUTDIR/$SUBJ/fa
 echo "0 0 -1 1" > $OUTDIR/$SUBJ/faces/$runname/contrasts/faceBlock_gr_shapesBlocks.txt
 
 cd $OUTDIR/$SUBJ/faces/$runname
-maskfile=${EXPERIMENT}/Analysis/Max/templates/DBIS115/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
+maskfile=${BASEDIR}/Analysis/Max/templates/DBIS115/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
 
 ## Faces block 1 > adjacent shapes blocks
 outname=glm_output_1

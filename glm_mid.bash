@@ -8,29 +8,30 @@
 index=${SGE_TASK_ID}
 BASEDIR=`biacmount DBIS.01`
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
+BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/DBIS_BEHAVIORAL_mid.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
 
 SUBJ=$1;
-firstDigit=$(echo $SUBJ | cut -c6)
-if [ $firstDigit -eq 2 ]; then # this is a retest scan
-	EXAMID=$(echo $SUBJ | cut -c6-10)
-else
-	EXAMID=$(echo $SUBJ | cut -c6-9)
-fi
 
 ###### Read behavioral data ######
 mkdir $OUTDIR/$SUBJ/mid/stimfiles
-
-if [ -e $BASEDIR/Data/Behavioral/QuickStrike/QuickStrike-$EXAMID.txt ]; then
-	perl $BASEDIR/Scripts/Behavioral/getMIDEprime_individual_AFNI.pl $BASEDIR/Data/Behavioral/QuickStrike/QuickStrike-$EXAMID.txt $OUTDIR/$SUBJ/mid/stimfiles
+SUBJ_NUM=$(echo $SUBJ | cut -c6-)
+if [ -e $BASEDIR/Data/Behavioral/QuickStrike/QuickStrike-$SUBJ_NUM.txt ]; then
+	perl $BASEDIR/Scripts/Behavioral/getMIDEprime.pl $BASEDIR/Data/Behavioral/QuickStrike/QuickStrike-$SUBJ_NUM.txt $OUTDIR/$SUBJ/mid
 else
-	if [ -e $BASEDIR/Data/Behavioral/QuickStrike/QuickStrike-${EXAMID:1:3}.txt ]; then
-		perl $BASEDIR/Scripts/Behavioral/getMIDEprime_individual_AFNI.pl $BASEDIR/Data/Behavioral/QuickStrike/QuickStrike-${EXAMID:1:3}.txt $OUTDIR/$SUBJ/mid/stimfiles
+	if [ -e $BASEDIR/Data/Behavioral/QuickStrike/QuickStrike-${SUBJ_NUM:1:3}.txt ]; then
+		perl $BASEDIR/Scripts/Behavioral/getMIDEprime.pl $BASEDIR/Data/Behavioral/QuickStrike/QuickStrike-${SUBJ_NUM:1:3}.txt $OUTDIR/$SUBJ/mid
 	else
-		echo "***Can't locate MID eprime txt file ($BASEDIR/Data/Behavioral/QuickStrike/QuickStrike-$EXAMID.txt or $BASEDIR/Data/Behavioral/QuickStrike/QuickStrike-${EXAMID:1:3}.txt). MID will not be run!***";
+		echo "***Can't locate QuickStrike eprime txt file ($BASEDIR/Data/Behavioral/QuickStrike/QuickStrike-$SUBJ_NUM.txt or $BASEDIR/Data/Behavioral/QuickStrike/QuickStrike-${SUBJ_NUM:1:3}.txt). mid will not be run!***";
 		exit 32;
 	fi	
+fi
+# write response data summary stats to master file
+found=$(grep $SUBJ $BehavioralFile | wc -l)
+if [ $found -eq 0 ]; then
+	vals=`awk '{print $2}' $OUTDIR/$SUBJ/mid/ResponseData.txt`
+	echo .,$vals | sed 's/ /,/g' >> $BehavioralFile
 fi
 
 # create FD and DVARS outlier file to use for censoring

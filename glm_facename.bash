@@ -8,11 +8,30 @@
 index=${SGE_TASK_ID}
 BASEDIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
+BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/DBIS_BEHAVIORAL_facename.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
 
 SUBJ=$1;
-EXAMID=$(echo $SUBJ | cut -c6-9)
+
+###### Read behavioral data ######
+SUBJ_NUM=$(echo $SUBJ | cut -c6-)
+if [ -e $BASEDIR/Data/Behavioral/NameGame/NameGame-$SUBJ_NUM.txt ]; then
+	perl $BASEDIR/Scripts/Behavioral/getFacenameEprime.pl $BASEDIR/Data/Behavioral/NameGame/NameGame-$SUBJ_NUM.txt $OUTDIR/$SUBJ/facename
+else
+	if [ -e $BASEDIR/Data/Behavioral/NameGame/NameGame-${SUBJ_NUM:1:3}.txt ]; then
+		perl $BASEDIR/Scripts/Behavioral/getFacenameEprime.pl $BASEDIR/Data/Behavioral/NameGame/NameGame-${SUBJ_NUM:1:3}.txt $OUTDIR/$SUBJ/facename
+	else
+		echo "***Can't locate facename eprime txt file ($BASEDIR/Data/Behavioral/NameGame/NameGame-$SUBJ_NUM.txt or $BASEDIR/Data/Behavioral/NameGame/NameGame-${SUBJ_NUM:1:3}.txt). Facename will not be run!***";
+		exit 32;
+	fi	
+fi
+# write response data summary stats to master file
+found=$(grep $SUBJ $BehavioralFile | wc -l)
+if [ $found -eq 0 ]; then
+	vals=`awk '{print $2}' $OUTDIR/$SUBJ/facename/ResponseData.txt`
+	echo .,$vals | sed 's/ /,/g' >> $BehavioralFile
+fi
 
 mkdir -p $OUTDIR/$SUBJ/facename/$runname/contrasts
 

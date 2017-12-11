@@ -8,55 +8,30 @@
 index=${SGE_TASK_ID}
 BASEDIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
+BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/DBIS_BEHAVIORAL_stroop.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
 
 SUBJ=$1;
-firstDigit=$(echo $SUBJ | cut -c6)
-if [ $firstDigit -eq 2 ]; then # this is a retest scan
-	EXAMID=$(echo $SUBJ | cut -c6-10)
-else
-	EXAMID=$(echo $SUBJ | cut -c6-9)
-fi
 
 ###### Read behavioral data ######
-if [ -e $BASEDIR/Data/Behavioral/Colors/Colors-$EXAMID.txt ]; then
-	perl $BASEDIR/Scripts/Behavioral/getStroopEprime_individual.pl $BASEDIR/Data/Behavioral/Colors/Colors-$EXAMID.txt $OUTDIR/$SUBJ/stroop
+SUBJ_NUM=$(echo $SUBJ | cut -c6-)
+if [ -e $BASEDIR/Data/Behavioral/Colors/Colors-$SUBJ_NUM.txt ]; then
+	perl $BASEDIR/Scripts/Behavioral/getStroopEprime.pl $BASEDIR/Data/Behavioral/Colors/Colors-$SUBJ_NUM.txt $OUTDIR/$SUBJ/stroop
 else
-	if [ -e $BASEDIR/Data/Behavioral/Colors/Colors-${EXAMID:1:3}.txt ]; then
-		perl $BASEDIR/Scripts/Behavioral/getStroopEprime_individual.pl $BASEDIR/Data/Behavioral/Colors/Colors-${EXAMID:1:3}.txt $OUTDIR/$SUBJ/stroop
+	if [ -e $BASEDIR/Data/Behavioral/Colors/Colors-${SUBJ_NUM:1:3}.txt ]; then
+		perl $BASEDIR/Scripts/Behavioral/getStroopEprime.pl $BASEDIR/Data/Behavioral/Colors/Colors-${SUBJ_NUM:1:3}.txt $OUTDIR/$SUBJ/stroop
 	else
-		echo "***Can't locate STroop eprime txt file ($BASEDIR/Data/Behavioral/Colors/Colors-$EXAMID.txt or $BASEDIR/Data/Behavioral/Colors/Colors-${EXAMID:1:3}.txt). Stroop will not be run!***";
+		echo "***Can't locate STroop eprime txt file ($BASEDIR/Data/Behavioral/Colors/Colors-$SUBJ_NUM.txt or $BASEDIR/Data/Behavioral/Colors/Colors-${SUBJ_NUM:1:3}.txt). Stroop will not be run!***";
 		exit 32;
 	fi	
 fi
-con_indices=(1 2 3 4 5 6 7 8 9 10 11 12 25 26 27 28 29 30 31 32 33 34 35 36 49 50 51 52 53 54 55 56 57 58 59 60) 
-incon_indices=(13 14 15 16 17 18 19 20 21 22 23 24 37 38 39 40 41 42 43 44 45 46 47 48 61 62 63 64 65 66 67 68 69 70 71 72) 
-mkdir $OUTDIR/$SUBJ/stroop/onsets;
-rm $OUTDIR/$SUBJ/stroop/onsets/*.txt; # just in case this is already here for some reason
-any_incorrect_incon=0;
-for i in "${incon_indices[@]}"; do
-	onset=`head -$i $OUTDIR/$SUBJ/stroop/Stroop_onsets.txt | tail -1`; 
-	acc=`head -$i $OUTDIR/$SUBJ/stroop/Stroop_acc.txt | tail -1`; 
-	if [ $acc -eq 0 ]; then
-		echo $(bc<<<"scale=3;$onset/1000") >> $OUTDIR/$SUBJ/stroop/onsets/incon_incorrect_onsets.txt;
-		any_incorrect_incon=1;
-	else
-		echo $(bc<<<"scale=3;$onset/1000") >> $OUTDIR/$SUBJ/stroop/onsets/incon_correct_onsets.txt;
-	fi
-done
-any_incorrect_con=0;
-for i in "${con_indices[@]}"; do
-	onset=`head -$i $OUTDIR/$SUBJ/stroop/Stroop_onsets.txt | tail -1`; 
-	acc=`head -$i $OUTDIR/$SUBJ/stroop/Stroop_acc.txt | tail -1`; 
-	if [ $acc -eq 0 ]; then
-		echo $(bc<<<"scale=3;$onset/1000") >> $OUTDIR/$SUBJ/stroop/onsets/con_incorrect_onsets.txt;
-		any_incorrect_con=1;
-	else
-		echo $(bc<<<"scale=3;$onset/1000") >> $OUTDIR/$SUBJ/stroop/onsets/con_correct_onsets.txt;
-	fi
-done
-rm $OUTDIR/$SUBJ/stroop/Stroop_*txt;
+# write response data summary stats to master file
+found=$(grep $SUBJ $BehavioralFile | wc -l)
+if [ $found -eq 0 ]; then
+	vals=`awk '{print $2}' $OUTDIR/$SUBJ/stroop/ResponseData.txt`
+	echo .,$vals | sed 's/ /,/g' >> $BehavioralFile
+fi
 
 mkdir -p $OUTDIR/$SUBJ/stroop/$runname/contrasts
 
@@ -136,6 +111,7 @@ rm ${outname}_Rerrts.nii.gz
 rm ${outname}_Rerrts_sd.nii.gz
 gzip ${outname}_tstats.nii
 rm ${outname}.nii   ### this file contains coef, fstat, and tstat for each condition and contrast, so since we are saving coefs and tstats separately for SPM, i think the only thing we lose here is fstat, which we probably dont want anyway
+
 
 # do this for calculating censored conditions later
 grep -v "#" Decon.xmat.1D | grep "1" > Decon.xmat.1D.matOnly
