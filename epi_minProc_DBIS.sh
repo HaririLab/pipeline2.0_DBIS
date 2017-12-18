@@ -27,6 +27,7 @@
 # --- BEGIN GLOBAL DIRECTIVE -- 
 #$ -o $HOME/$JOB_NAME.$JOB_ID.out
 #$ -e $HOME/$JOB_NAME.$JOB_ID.out
+#$ -l h_vmem=16G 
 # -- END GLOBAL DIRECTIVE -- 
 
 sub=$1 #$1 or flag -s  #20161103_21449 #pipenotes= Change away from HardCoding later 
@@ -44,7 +45,12 @@ templatePre=dunedin115template_MNI_ #pipenotes= update/Change away from HardCodi
 #T1=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
 threads=$3
 if [ ${#threads} -eq 0 ]; then threads=1; fi 
+fieldMapDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_gre_field_mapping_2mm/
+export PATH=$PATH:$scriptDir/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
+export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
+export OMP_NUM_THREADS=$threads
 
+echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]----"
 
 # # ##Make sure anatomical has been run
 # # if [ ! -e ${antDir}/${antPre}BrainSegmentation.nii.gz ]; then
@@ -78,17 +84,14 @@ else
 		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 		exit
 fi
-fieldMapDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_gre_field_mapping_2mm/
-export PATH=$PATH:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/Pipelines/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
-export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
-export OMP_NUM_THREADS=$threads
+
 ##Set up directory
 mkdir -p $QADir
 mkdir -p $outDir
 mkdir $tmpDir
 cd $outDir
 
-###Build Epi and Field map from DICOM
+###Build Epi from DICOM
 Dimon -gert_to3d_prefix epi.nii.gz -infile_prefix ${epiDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset
 mv epi.nii.gz dimon* GERT* ${tmpDir}
 # # dcm2nii ${fieldMapDir}
@@ -281,8 +284,11 @@ CreateTiledMosaic -i ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz -r
 CreateTiledMosaic -i ${tmpDir}/epiPreb0.nii.gz -r ${tmpDir}/epiPreb0.nii.gz -o ${QADir}/${task}.preB0.png -a 0 -t -1x-1 -d 2 -p mask -s [15,0,120] -x ${tmpDir}/epiPreb0.nii.gz -f 0x1 -p 0
 CreateTiledMosaic -i ${tmpDir}/epiPostb0.nii.gz -r ${tmpDir}/epiPostb0.nii.gz -o ${QADir}/${task}.postB0.png -a 0 -t -1x-1 -d 2 -p mask -s [15,0,120] -x ${tmpDir}/epiPostb0.nii.gz -f 0x1 -p 0
 
+### copy files for vis check
+cp ${QADir}/$task.epi2TemplateAlignmentCheck.png /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/$task.epi2TemplateAlignmentCheck/$sub.png
+
 ##Clean up
-# rm -r $tmpDir
+rm -r $tmpDir
 
 ##run first level model
 if [ $task != "rest" ]; then

@@ -3,16 +3,18 @@
 # --- BEGIN GLOBAL DIRECTIVE -- 
 #$ -o $HOME/$JOB_NAME.$JOB_ID.out
 #$ -e $HOME/$JOB_NAME.$JOB_ID.out
+#$ -l h_vmem=12G 
 # -- END GLOBAL DIRECTIVE -- 
 
-index=${SGE_TASK_ID}
 BASEDIR=`biacmount DBIS.01`
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
 BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/DBIS_BEHAVIORAL_mid.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
+MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/BOLD_mid_$runname.csv
 
 SUBJ=$1;
+echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $SUBJ START [`date`] on HOST [$HOSTNAME]----"
 
 ###### Read behavioral data ######
 mkdir $OUTDIR/$SUBJ/mid/stimfiles
@@ -99,6 +101,20 @@ rm ${outname}_Rerrts.nii.gz
 rm ${outname}_Rerrts_sd.nii.gz
 gzip ${outname}_tstats.nii
 rm ${outname}.nii  ### this file contains coef, fstat, and tstat for each condition and contrast, so since we are saving coefs and tstats separately for SPM, i think the only thing we lose here is fstat, which we probably dont want anyway
+
+# extract ROI means to master file
+# first check for old values in master files and delete if found
+lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
+if [ $lineNum -gt 0 ]; then	sed -i "${lineNum}d" $MasterFile; fi
+rdir=$BASEDIR/Analysis/ROI/VS
+str=$SUBJ
+for roi in VS_5mm_L VS_5mm_R VS_10mm_L VS_10mm_R; do 
+    vals=$(3dROIstats -nzmean -mask $rdir/$roi.nii $OUTDIR/$SUBJ/mid/$runname/${outname}_coefs.nii | grep mid | awk '{print $3}'); 
+    str=$str,$(echo $vals | sed 's/ /,/g')
+done; 
+echo $str >> $MasterFile; 
+
+sh $BASEDIR/Scripts/pipeline2.0_DBIS/scripts/getConditionsCensored.bash $SUBJ mid
 
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 

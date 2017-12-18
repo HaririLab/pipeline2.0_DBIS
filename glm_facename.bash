@@ -3,16 +3,18 @@
 # --- BEGIN GLOBAL DIRECTIVE -- 
 #$ -o $HOME/$JOB_NAME.$JOB_ID.out
 #$ -e $HOME/$JOB_NAME.$JOB_ID.out
+#$ -l h_vmem=12G 
 # -- END GLOBAL DIRECTIVE -- 
 
-index=${SGE_TASK_ID}
 BASEDIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
 BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/DBIS_BEHAVIORAL_facename.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
+MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/BOLD_facename_$runname.csv
 
 SUBJ=$1;
+echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $SUBJ START [`date`] on HOST [$HOSTNAME]----"
 
 ###### Read behavioral data ######
 SUBJ_NUM=$(echo $SUBJ | cut -c6-)
@@ -85,6 +87,20 @@ rm ${outname}_Rerrts.nii.gz
 rm ${outname}_Rerrts_sd.nii.gz
 gzip ${outname}_tstats.nii
 rm ${outname}.nii
+
+# extract ROI means to master file
+# first check for old values in master files and delete if found
+lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
+if [ $lineNum -gt 0 ]; then	sed -i "${lineNum}d" $MasterFile; fi
+rdir=$BASEDIR/Analysis/ROI/Hippocampus/
+str=$SUBJ
+for roi in Hippocampus_AAL_L Hippocampus_AAL_R; do 
+    vals=$(3dROIstats -nzmean -mask $rdir/$roi.nii $OUTDIR/$SUBJ/facename/$runname/${outname}_coefs.nii | grep facename | awk '{print $3}'); 
+    str=$str,$(echo $vals | sed 's/ /,/g')
+done; 
+echo $str >> $MasterFile; 
+
+sh $BASEDIR/Scripts/pipeline2.0_DBIS/scripts/getConditionsCensored.bash $SUBJ facename
 
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 

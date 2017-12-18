@@ -26,6 +26,7 @@
 # --- BEGIN GLOBAL DIRECTIVE -- 
 #$ -o $HOME/$JOB_NAME.$JOB_ID.out
 #$ -e $HOME/$JOB_NAME.$JOB_ID.out
+#$ -l h_vmem=24G 
 # -- END GLOBAL DIRECTIVE -- 
 
 sub=$1 #$1 or flag -s  #20161103_21449 #pipenotes= Change away from HardCoding later 
@@ -52,6 +53,8 @@ export SUBJECTS_DIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Im
 export FREESURFER_HOME=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/freesurfer
 export ANTSPATH=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/ants-2.2.0/bin/
 export PATH=$PATH:${baseDir}/scripts/:${baseDir}/utils/:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/ants-2.2.0/bin/
+echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]----" 
+
 ##Set up directory
 mkdir -p $QADir
 cd $subDir
@@ -68,8 +71,6 @@ FLAIR=${tmpDir}/flair.nii.gz
 #	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 #	exit
 #fi
-
-
 
 if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];then
 	Dimon -infile_prefix ${anatDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin
@@ -115,7 +116,7 @@ if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate_blur8mm.nii.
 	3dBlurInMask -input ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz -mask ${templateDir}/${templatePre}_AvgGMSegWarped25connected.nii.gz -FWHM 8 -prefix ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate_blur8mm.nii.gz
 fi
 ###Make VBM and smooth
-if [[ ! -f ${antDir}/${antPre}JacModVBM_blur8mm.nii.gz ]];then
+if [[ ! -f ${antDir}/${antPre}JacModVBM_blur8mm.nii.gz ]] && [[ ! -f ${antDir}/${antPre}JacModVBM_blur8mm.nii ]];then
 	antsApplyTransforms -d 3 -r ${templateDir}/${templatePre}.nii.gz -i ${antDir}/${antPre}BrainSegmentationPosteriors2.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -o ${antDir}/${antPre}GMwarped.nii.gz
 	antsApplyTransforms -d 3 -r ${templateDir}/${templatePre}.nii.gz -i ${antDir}/${antPre}BrainSegmentationPosteriors4.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -o ${antDir}/${antPre}SCwarped.nii.gz
 	antsApplyTransforms -d 3 -r ${templateDir}/${templatePre}.nii.gz -i ${antDir}/${antPre}BrainSegmentationPosteriors5.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -o ${antDir}/${antPre}BSwarped.nii.gz
@@ -165,6 +166,37 @@ if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	#cp ${freeDir}/mri/brainmask.auto.mgz ${freeDir}/mri/brainmask.mgz
 	#recon-all -autorecon2 -autorecon3 -s $sub -openmp $threads
 	recon-all -s $sub -localGI -openmp $threads
+	### Add freesurfer values to Master files
+	MasterDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/testing/
+	for file in `ls $MasterDir/FreeSurfer_[aBw]*csv`; do
+		# check for old values in master files and delete if found
+		lineNum=$(grep -n $sub $file | cut -d: -f1);
+		if [ $lineNum -gt 0 ]; then
+			sed -i "${lineNum}d" $file
+		fi
+	done
+	for f in `ls $freeDir/stats/lh*stats $freeDir/stats/[aw]*stats`; do
+		if [ $f != $freeDir/stats/lh.curv.stats ]; then # this file is different so skip it
+			measures=`grep "ColHeaders" $f | cut -d" " -f3-`; # skip first "#" and "ColHeaders" so col numbers line up with data
+			fname=${f/$freeDir\/stats\//}
+			fname_short=${fname/lh./}
+			i=1; 
+			for measure in $measures; do 
+				if [ $measure != StructName ] && [ $measure != Index ] && [ $measure != SegId ]; then 
+					vals_L=`grep -v "#" $freeDir/stats/${fname} | awk -v colnum=$i '{print $colnum}'`; 
+					str_L=$(echo $sub,$vals_L | sed 's/ /,/g')
+					if [[ $f == *"/lh."* ]]; then
+						vals_R=`grep -v "#" $freeDir/stats/${fname/lh/rh} | awk -v colnum=$i '{print $colnum}'`; 
+						str_R=$(echo $vals_R | sed 's/ /,/g')
+						echo $str_L,$str_R	>> ${MasterDir}FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
+					else
+						echo $str_L	>> ${MasterDir}FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
+					fi
+				fi; 
+				i=$((i+1)); 
+			done
+		fi
+	done	
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!Skipping FreeSurfer, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -211,40 +243,25 @@ if [ $found -eq 0 ]; then
 	mv ${antDir}/tmp/anat.nii.gz $graphicsDir/$sub/HighRes.nii.gz 
 	cp ${antDir}/${antPre}ExtractedBrain0N4.nii.gz $graphicsDir/$sub/c1HighRes.nii.gz 
 fi
-### Add freesurfer values to Master files
-MasterDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/testing2/
-found=$(grep $sub $MasterDir/FreeSurfer_aparc.a2009s_GrayVol.csv | wc -l);
-if [ $found -eq 0 ]; then
-	for f in `ls $freeDir/stats/lh*aparc*stats`; do
-		measures=`grep "ColHeaders" $f`;
-		fname=${f/$freeDir\/stats\//}
-		fname_short=${fname/lh./}
-		i=1; 
-		for measure in $measures; do 
-			if [[ $i > 3 ]]; then # first three measure labels are #, ColHeaders, and Structname
-				col=$((i-2)); 
-				vals_L=`grep -v "#" $freeDir/stats/${fname} | awk -v colnum=$col '{print $colnum}'`; 
-				vals_R=`grep -v "#" $freeDir/stats/${fname/lh/rh} | awk -v colnum=$col '{print $colnum}'`; 
-				str_L=$(echo $sub,$vals_L | sed 's/ /,/g')
-				str_R=$(echo $vals_R | sed 's/ /,/g')
-				echo $str_L,$str_R	>> ${MasterDir}FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
-			fi; 
-			i=$((i+1)); 
-		done
-	done	
-fi
+
+### copy files for vis check
+cp ${QADir}/anat.BrainExtractionCheckAxial.png /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/anat.BrainExtractionCheckAxial/$sub.png
+cp ${QADir}/anat.BrainExtractionCheckSag.png /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/anat.BrainExtractionCheckSag/$sub.png
+cp ${QADir}/anat.antCTCheck.png /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/anat.antCTCheck/$sub.png
+
 #cleanup
 #mv highRes_* antCT/ #pipeNotes: add more deletion and clean up to minimize space, think about deleting Freesurfer and some of SUMA output
-rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject* ${subDir}/dimon.files* ${subDir}/GERT_Reco* ${antDir}/tmp
-rm -r ${antDir}/tmp ${freeDir}/SUMA/FreeSurfer_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.*
+# # # # leave this out for now until completely finished with testing!
+rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject* ${subDir}/dimon.files* ${subDir}/GERT_Reco* 
+rm -r ${antDir}/tmp ${freeDir}/SUMA/${sub}_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.*
 gzip ${freeDir}/SUMA/*.nii 
 
-### Now run EPI preprocessing
-qsub $baseDir/epi_minProc_DBIS.sh $sub faces 1
-qsub $baseDir/epi_minProc_DBIS.sh $sub stroop 1
-qsub $baseDir/epi_minProc_DBIS.sh $sub mid 1
-qsub $baseDir/epi_minProc_DBIS.sh $sub facename 1
-qsub $baseDir/epi_minProc_DBIS.sh $sub rest 1
+### Now run EPI preprocessing (if it has not been done; this should only happen in the case where we are re-running this script to add something like CT etc)
+for task in faces stroop mid facename; do
+	if [ ! -e $subDir/$task/epiWarped_blur6mm.nii.gz ]; then
+		qsub $baseDir/epi_minProc_DBIS.sh $sub $task 1
+	fi
+done
  
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 

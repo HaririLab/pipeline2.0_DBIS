@@ -4,6 +4,7 @@
 # --- BEGIN GLOBAL DIRECTIVE -- 
 #$ -o $HOME/$JOB_NAME.$JOB_ID.out
 #$ -e $HOME/$JOB_NAME.$JOB_ID.out
+#$ -l h_vmem=12G 
 # -- END GLOBAL DIRECTIVE -- 
 
 BASEDIR=`biacmount DBIS.01`
@@ -11,8 +12,10 @@ OUTDIR=$BASEDIR/Analysis/All_Imaging/
 BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/DBIS_BEHAVIORAL_faces.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI_splitRuns
+MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/BOLD_faces_$runname.csv
 
 SUBJ=$1
+echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $SUBJ START [`date`] on HOST [$HOSTNAME]----"
 
 ###### Read behavioral data ######
 SUBJ_NUM=$(echo $SUBJ | cut -c6-)
@@ -154,6 +157,21 @@ mv glm_output_${surp}_betas.nii.gz surprise_betas.nii.gz
 3dcalc -prefix fear_gr_neutral.nii.gz -a fear_betas.nii.gz'[2]' -b fear_betas.nii.gz'[0]' -c neutral_betas.nii.gz'[2]' -d neutral_betas.nii.gz'[0]' -expr '(a+b-(c+d))' 
 3dcalc -prefix anger+fear_gr_neutral.nii.gz  -a anger_betas.nii.gz'[2]' -b anger_betas.nii.gz'[0]' -c fear_betas.nii.gz'[2]' -d fear_betas.nii.gz'[0]' -e neutral_betas.nii.gz'[2]' -f neutral_betas.nii.gz'[0]' -expr '((a+b+c+d)/2-(e+f))' 
 3dcalc -prefix faces_gr_shapes_avg.nii.gz  -a anger_betas.nii.gz'[2]' -b fear_betas.nii.gz'[2]' -c neutral_betas.nii.gz'[2]' -d surprise_betas.nii.gz'[2]' -expr '((a+b+c+d)/4)' 
+
+# extract ROI means to master file 
+# first check for old values in master files and delete if found
+lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
+if [ $lineNum -gt 0 ]; then	sed -i "${lineNum}d" $MasterFile; fi
+rdir=$BASEDIR/Analysis/ROI/Amygdala
+str=$SUBJ
+for con in anger_gr_neutral fear_gr_neutral anger+fear_gr_neutral faces_gr_shapes_avg; do
+    for roi in Tyszka_ALL_L Tyszka_ALL_R Tyszka_BL_L Tyszka_BL_R Tyszka_CM_L Tyszka_CM_R; do 
+        vals=$(3dROIstats -nzmean -mask $rdir/$roi.nii $con.nii.gz | grep Faces | awk '{print $3}'); 
+		echo $con $roi $vals
+        str=$str,$(echo $vals | sed 's/ /,/g')
+    done; 
+done
+echo $str >> $MasterFile; 
 
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 

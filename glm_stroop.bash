@@ -3,9 +3,9 @@
 # --- BEGIN GLOBAL DIRECTIVE -- 
 #$ -o $HOME/$JOB_NAME.$JOB_ID.out
 #$ -e $HOME/$JOB_NAME.$JOB_ID.out
+#$ -l h_vmem=12G 
 # -- END GLOBAL DIRECTIVE -- 
 
-index=${SGE_TASK_ID}
 BASEDIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
 BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/DBIS_BEHAVIORAL_stroop.csv
@@ -13,6 +13,7 @@ fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
 
 SUBJ=$1;
+echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $SUBJ START [`date`] on HOST [$HOSTNAME]----"
 
 ###### Read behavioral data ######
 SUBJ_NUM=$(echo $SUBJ | cut -c6-)
@@ -112,6 +113,7 @@ rm ${outname}_Rerrts_sd.nii.gz
 gzip ${outname}_tstats.nii
 rm ${outname}.nii   ### this file contains coef, fstat, and tstat for each condition and contrast, so since we are saving coefs and tstats separately for SPM, i think the only thing we lose here is fstat, which we probably dont want anyway
 
+sh $BASEDIR/Scripts/pipeline2.0_DBIS/scripts/getConditionsCensored.bash $SUBJ stroop
 
 # do this for calculating censored conditions later
 grep -v "#" Decon.xmat.1D | grep "1" > Decon.xmat.1D.matOnly
