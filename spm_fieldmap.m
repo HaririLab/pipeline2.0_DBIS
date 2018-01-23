@@ -42,7 +42,7 @@ if(length(images)>0)
     % there should be 3 sDMHDS*.nii files!  typically 0006...01 & 02.nii and 0007...02.nii
     % the first 2 are magnitude images, and the first should have the shorter echo
     % the third is the phase difference image, calculated by the scanner
-    images=dir([homedir '/SUB_SUBJECT_SUB/SUB_TASK_SUB/sD*nii']);
+    images=dir([homedir '/SUB_SUBJECT_SUB/SUB_TASK_SUB/s*nii']);
     fprintf('***Renaming %s to magnitude_image_1.nii***\n',images(1).name);
     movefile([homedir '/SUB_SUBJECT_SUB/SUB_TASK_SUB/' images(1).name],[homedir '/SUB_SUBJECT_SUB/SUB_TASK_SUB/magnitude_image_1.nii']);
     fprintf('***Deleting magnitude_image_2 file %s***\n',images(2).name);
