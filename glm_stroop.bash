@@ -8,7 +8,8 @@
 
 BASEDIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
-BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/DBIS_BEHAVIORAL_stroop.csv
+TASKDIR=stroop_redo
+BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/fMRI_Behavioral/Stroop.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
 
@@ -18,10 +19,10 @@ echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $SUBJ START [`date`] on HOST [$HOSTNAME]-
 ###### Read behavioral data ######
 SUBJ_NUM=$(echo $SUBJ | cut -c6-)
 if [ -e $BASEDIR/Data/Behavioral/Colors/Colors-$SUBJ_NUM.txt ]; then
-	perl $BASEDIR/Scripts/Behavioral/getStroopEprime.pl $BASEDIR/Data/Behavioral/Colors/Colors-$SUBJ_NUM.txt $OUTDIR/$SUBJ/stroop
+	perl $BASEDIR/Scripts/Behavioral/getStroopEprime.pl $BASEDIR/Data/Behavioral/Colors/Colors-$SUBJ_NUM.txt $OUTDIR/$SUBJ/$TASKDIR
 else
 	if [ -e $BASEDIR/Data/Behavioral/Colors/Colors-${SUBJ_NUM:1:3}.txt ]; then
-		perl $BASEDIR/Scripts/Behavioral/getStroopEprime.pl $BASEDIR/Data/Behavioral/Colors/Colors-${SUBJ_NUM:1:3}.txt $OUTDIR/$SUBJ/stroop
+		perl $BASEDIR/Scripts/Behavioral/getStroopEprime.pl $BASEDIR/Data/Behavioral/Colors/Colors-${SUBJ_NUM:1:3}.txt $OUTDIR/$SUBJ/$TASKDIR
 	else
 		echo "***Can't locate STroop eprime txt file ($BASEDIR/Data/Behavioral/Colors/Colors-$SUBJ_NUM.txt or $BASEDIR/Data/Behavioral/Colors/Colors-${SUBJ_NUM:1:3}.txt). Stroop will not be run!***";
 		exit 32;
@@ -30,45 +31,49 @@ fi
 # write response data summary stats to master file
 found=$(grep $SUBJ $BehavioralFile | wc -l)
 if [ $found -eq 0 ]; then
-	vals=`awk '{print $2}' $OUTDIR/$SUBJ/stroop/ResponseData.txt`
+	vals=`awk '{print $2}' $OUTDIR/$SUBJ/$TASKDIR/ResponseData.txt`
 	echo .,$vals | sed 's/ /,/g' >> $BehavioralFile
 fi
 
-mkdir -p $OUTDIR/$SUBJ/stroop/$runname/contrasts
+mkdir -p $OUTDIR/$SUBJ/$TASKDIR/$runname/contrasts
 
 # create FD and DVARS outlier file to use for censoring
 nTRs=209;
 if [ "$SUBJ" == "DMHDS0234" ]; then nTRs=208; fi
 echo "nTRs: $nTRs"
 for i in `seq $nTRs`; do 
-	FD=`head -$i $OUTDIR/$SUBJ/stroop/FD.1D | tail -1`; 
+	FD=`head -$i $OUTDIR/$SUBJ/$TASKDIR/FD.1D | tail -1`; 
 	if [[ $FD == *"e"* ]]; then FD=0; fi  ### sometimes its so small that it gets spit out in scientific notation which will cause below to fail, so just set to 0
-	if [ $i -eq 1 ]; then DVARS=0; else DVARS=`head -$((i-1)) $OUTDIR/$SUBJ/stroop/DVARS.1D | tail -1`; fi; 
+	if [ $i -eq 1 ]; then DVARS=0; else DVARS=`head -$((i-1)) $OUTDIR/$SUBJ/$TASKDIR/DVARS.1D | tail -1`; fi; 
 	if [[ $DVARS == *"e"* ]]; then DVARS=0; fi  ### sometimes its so small that it gets spit out in scientific notation which will cause below to fail, so just set to 0
 	echo $(( 1 - $(echo "$FD > $fthr || $DVARS > $dthr" | bc -l) )); 
-done > $OUTDIR/$SUBJ/stroop/$runname/outliers.1D; 
+done > $OUTDIR/$SUBJ/$TASKDIR/$runname/outliers.1D; 
 
 # create contrast files
 ######### don't forget to change # of leading 0s if you change polort!!!
+n_incorrect_con=$(less $OUTDIR/$SUBJ/$TASKDIR/onsets/con_incorrect_onsets.txt | wc -l);
+if [ $n_incorrect_con -gt 0 ]; then any_incorrect_con=1; else any_incorrect_con=0; fi
+n_incorrect_incon=$(less $OUTDIR/$SUBJ/$TASKDIR/onsets/incon_incorrect_onsets.txt | wc -l);
+if [ $n_incorrect_incon -gt 0 ]; then any_incorrect_incon=1; else any_incorrect_incon=0; fi
 if [ $((any_incorrect_con+any_incorrect_incon)) -eq 0 ]; then 
-	echo "0 0 0 0 1 -1" > $OUTDIR/$SUBJ/stroop/$runname/contrasts/incon_gr_con.txt
+	echo "0 0 0 0 1 -1" > $OUTDIR/$SUBJ/$TASKDIR/$runname/contrasts/incon_gr_con.txt
 elif [ $((any_incorrect_con+any_incorrect_incon)) -eq 1 ]; then
-	echo "0 0 0 0 1 -1 0" > $OUTDIR/$SUBJ/stroop/$runname/contrasts/incon_gr_con.txt
+	echo "0 0 0 0 1 -1 0" > $OUTDIR/$SUBJ/$TASKDIR/$runname/contrasts/incon_gr_con.txt
 	if [ $any_incorrect_incon -eq 1 ]; then
-		echo "0 0 0 0 -1 0 1" > $OUTDIR/$SUBJ/stroop/$runname/contrasts/inconIncorrect_gr_incon.txt
+		echo "0 0 0 0 -1 0 1" > $OUTDIR/$SUBJ/$TASKDIR/$runname/contrasts/inconIncorrect_gr_incon.txt
 	fi
 elif [ $((any_incorrect_con+any_incorrect_incon)) -eq 2 ]; then
-	echo "0 0 0 0 1 -1 0 0 " > $OUTDIR/$SUBJ/stroop/$runname/contrasts/incon_gr_con.txt
-	echo "0 0 0 0 -1 0 1 0" > $OUTDIR/$SUBJ/stroop/$runname/contrasts/inconIncorrect_gr_incon.txt
+	echo "0 0 0 0 1 -1 0 0 " > $OUTDIR/$SUBJ/$TASKDIR/$runname/contrasts/incon_gr_con.txt
+	echo "0 0 0 0 -1 0 1 0" > $OUTDIR/$SUBJ/$TASKDIR/$runname/contrasts/inconIncorrect_gr_incon.txt
 fi
 
-cd $OUTDIR/$SUBJ/stroop/$runname
+cd $OUTDIR/$SUBJ/$TASKDIR/$runname
 maskfile=${BASEDIR}/Analysis/Max/templates/DBIS115/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
 outname=glm_output
 # arguments to stim_times are in seconds!
 # glt arg should always be 1
 # using polort 3 here per recommendation in afni_proc.py help documentation
-echo "3dDeconvolve -input $OUTDIR/$SUBJ/stroop/epiWarped_blur6mm.nii.gz -xout -polort 3 -mask $maskfile -num_stimts $((2+any_incorrect_incon+any_incorrect_con)) \\" >> run_3ddeconvolve.sh
+echo "3dDeconvolve -input $OUTDIR/$SUBJ/$TASKDIR/epiWarped_blur6mm.nii.gz -xout -polort 3 -mask $maskfile -num_stimts $((2+any_incorrect_incon+any_incorrect_con)) \\" >> run_3ddeconvolve.sh
 echo "-stim_times 1 ../onsets/incon_correct_onsets.txt 'SPMG1(3)' -stim_label 1 Incongruent_correct \\" >> run_3ddeconvolve.sh
 echo "-stim_times 2 ../onsets/con_correct_onsets.txt 'SPMG1(3)' -stim_label 2 Congruent_correct \\" >> run_3ddeconvolve.sh
 nextCondNum=3;
@@ -80,7 +85,7 @@ echo "-glt 1 contrasts/incon_gr_con.txt -glt_label 1 incon_gr_con \\" >> run_3dd
 if [ $any_incorrect_incon -gt 0 ]; then echo "-glt 1 contrasts/inconIncorrect_gr_incon.txt -glt_label 2 inconIncorrect_gr_incon \\" >> run_3ddeconvolve.sh; fi
 echo "-x1D_stop" >> run_3ddeconvolve.sh
 echo "" >> run_3ddeconvolve.sh
-echo "3dREMLfit -input $OUTDIR/$SUBJ/stroop/epiWarped_blur6mm.nii.gz -matrix Decon.xmat.1D -mask $maskfile \\" >> run_3ddeconvolve.sh
+echo "3dREMLfit -input $OUTDIR/$SUBJ/$TASKDIR/epiWarped_blur6mm.nii.gz -matrix Decon.xmat.1D -mask $maskfile \\" >> run_3ddeconvolve.sh
 echo "-Rbuck ${outname}.nii \\" >> run_3ddeconvolve.sh
 echo "-noFDR -tout -Rerrts ${outname}_Rerrts.nii.gz" >> run_3ddeconvolve.sh
  
@@ -120,5 +125,5 @@ grep -v "#" Decon.xmat.1D | grep "1" > Decon.xmat.1D.matOnly
 
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 
-mv $HOME/$JOB_NAME.$JOB_ID.out $OUTDIR/$SUBJ/stroop/$runname/$JOB_NAME.$JOB_ID.out	 
+mv $HOME/$JOB_NAME.$JOB_ID.out $OUTDIR/$SUBJ/$TASKDIR/$runname/$JOB_NAME.$JOB_ID.out	 
 # -- END POST-USER -- 

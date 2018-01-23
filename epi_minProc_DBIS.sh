@@ -35,7 +35,7 @@ task=$2
 scriptDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
 subDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
 QADir=${subDir}/QA
-outDir=${subDir}/${task}
+outDir=${subDir}/${task}_redo
 tmpDir=${outDir}/tmp
 antDir=${subDir}/antCT
 freeDir=${subDir}/FreeSurfer

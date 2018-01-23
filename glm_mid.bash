@@ -8,10 +8,10 @@
 
 BASEDIR=`biacmount DBIS.01`
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
-BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/DBIS_BEHAVIORAL_mid.csv
+BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/fMRI_Behavioral/MID.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
-MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/BOLD_mid_$runname.csv
+MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/BOLD_ROImeans_mid_$runname.csv
 
 SUBJ=$1;
 echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $SUBJ START [`date`] on HOST [$HOSTNAME]----"
@@ -102,17 +102,27 @@ rm ${outname}_Rerrts_sd.nii.gz
 gzip ${outname}_tstats.nii
 rm ${outname}.nii  ### this file contains coef, fstat, and tstat for each condition and contrast, so since we are saving coefs and tstats separately for SPM, i think the only thing we lose here is fstat, which we probably dont want anyway
 
-# extract ROI means to master file
-# first check for old values in master files and delete if found
-lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
-if [ $lineNum -gt 0 ]; then	sed -i "${lineNum}d" $MasterFile; fi
-rdir=$BASEDIR/Analysis/ROI/VS
-str=$SUBJ
-for roi in VS_5mm_L VS_5mm_R VS_10mm_L VS_10mm_R; do 
-    vals=$(3dROIstats -nzmean -mask $rdir/$roi.nii $OUTDIR/$SUBJ/mid/$runname/${outname}_coefs.nii | grep mid | awk '{print $3}'); 
-    str=$str,$(echo $vals | sed 's/ /,/g')
-done; 
-echo $str >> $MasterFile; 
+# extract ROI means to master file, using a lock dir system to make sure only one process does this at a time
+if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
+while true; do
+	if mkdir $HOME/locks/mid; then
+		sleep 5 # seems like this is necessary to make sure any other processes are fully finsihed
+		# first check for old values in master files and delete if found
+		lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
+		if [ $lineNum -gt 0 ]; then	sed -i "${lineNum}d" $MasterFile; fi
+		rdir=$BASEDIR/Analysis/ROI/VS
+		str=$SUBJ
+		for roi in VS_5mm_L VS_5mm_R VS_10mm_L VS_10mm_R; do 
+		    vals=$(3dROIstats -nzmean -mask $rdir/$roi.nii $OUTDIR/$SUBJ/mid/$runname/${outname}_coefs.nii | grep mid | awk '{print $3}'); 
+		    str=$str,$(echo $vals | sed 's/ /,/g')
+		done; 
+		echo $str >> $MasterFile; 
+		rm -r $HOME/locks/mid
+		break
+	else
+		sleep 2
+	fi
+done
 
 sh $BASEDIR/Scripts/pipeline2.0_DBIS/scripts/getConditionsCensored.bash $SUBJ mid
 

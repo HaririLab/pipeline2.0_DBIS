@@ -9,10 +9,10 @@
 
 BASEDIR=`biacmount DBIS.01`
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
-BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/DBIS_BEHAVIORAL_faces.csv
+BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/fMRI_Behavioral/Faces.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI_splitRuns
-MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/testing/BOLD_faces_$runname.csv
+MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/BOLD_ROImeans_faces_$runname.csv
 
 SUBJ=$1
 echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $SUBJ START [`date`] on HOST [$HOSTNAME]----"
@@ -36,7 +36,7 @@ if [ $found -eq 0 ]; then
 	echo .,$vals | sed 's/ /,/g' >> $BehavioralFile
 fi
 # Get faces order 
-if [ $SUBJ -eq DMHDS0339 ]; then # this sub's eprime file was accidentally overwritten with one having the wrong order 
+if [[ $SUBJ == DMHDS0339 ]]; then # this sub's eprime file was accidentally overwritten with one having the wrong order 
 	FACESORDER=1; 
 else	
 	FACESORDER=$(grep Order $OUTDIR/$SUBJ/faces/ResponseData.txt | cut -d" " -f2)
@@ -158,20 +158,31 @@ mv glm_output_${surp}_betas.nii.gz surprise_betas.nii.gz
 3dcalc -prefix anger+fear_gr_neutral.nii.gz  -a anger_betas.nii.gz'[2]' -b anger_betas.nii.gz'[0]' -c fear_betas.nii.gz'[2]' -d fear_betas.nii.gz'[0]' -e neutral_betas.nii.gz'[2]' -f neutral_betas.nii.gz'[0]' -expr '((a+b+c+d)/2-(e+f))' 
 3dcalc -prefix faces_gr_shapes_avg.nii.gz  -a anger_betas.nii.gz'[2]' -b fear_betas.nii.gz'[2]' -c neutral_betas.nii.gz'[2]' -d surprise_betas.nii.gz'[2]' -expr '((a+b+c+d)/4)' 
 
-# extract ROI means to master file 
-# first check for old values in master files and delete if found
-lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
-if [ $lineNum -gt 0 ]; then	sed -i "${lineNum}d" $MasterFile; fi
-rdir=$BASEDIR/Analysis/ROI/Amygdala
-str=$SUBJ
-for con in anger_gr_neutral fear_gr_neutral anger+fear_gr_neutral faces_gr_shapes_avg; do
-    for roi in Tyszka_ALL_L Tyszka_ALL_R Tyszka_BL_L Tyszka_BL_R Tyszka_CM_L Tyszka_CM_R; do 
-        vals=$(3dROIstats -nzmean -mask $rdir/$roi.nii $con.nii.gz | grep Faces | awk '{print $3}'); 
-		echo $con $roi $vals
-        str=$str,$(echo $vals | sed 's/ /,/g')
-    done; 
+# extract ROI means to master file, using a lock dir system to make sure only one processes does this at a time 
+if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
+while true; do
+	if mkdir $HOME/locks/faces; then
+		sleep 5 # seems like this is necessary to make sure any other processes have fully finished
+		# first check for old values in master files and delete if found
+		lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
+		if [ $lineNum -gt 0 ]; then	sed -i "${lineNum}d" $MasterFile; fi
+		rdir=$BASEDIR/Analysis/ROI/Amygdala
+		str=$SUBJ
+		for con in anger_gr_neutral fear_gr_neutral anger+fear_gr_neutral faces_gr_shapes_avg; do
+		    for roi in Tyszka_ALL_L Tyszka_ALL_R Tyszka_BL_L Tyszka_BL_R Tyszka_CM_L Tyszka_CM_R; do 
+			vals=$(3dROIstats -nzmean -mask $rdir/$roi.nii $con.nii.gz | grep Faces | awk '{print $3}'); 
+			str=$str,$(echo $vals | sed 's/ /,/g')
+		    done; 
+		done
+		echo $str >> $MasterFile; 
+		rm -r $HOME/locks/faces
+		break
+	else
+		sleep 2
+	fi
 done
-echo $str >> $MasterFile; 
+
+sh $BASEDIR/Scripts/pipeline2.0_DBIS/scripts/getConditionsCensored.bash $SUBJ faces
 
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 

@@ -143,6 +143,16 @@ if [[ ! -f ${QADir}/anat.BrainExtractionCheckAxial.png ]];then
 	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheckAxial.png -a 0.5 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
 	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheckSag.png -a 0.5 -t -1x-1 -d 0 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
 fi
+
+### Now submit jobs to run EPI preprocessing (check if it's already been done in case we are re-running this script to add something like CT etc)
+# do this before freesurfer because freesurfer takes a long time and epis don't depend on any freesurfer output
+for task in faces stroop mid facename; do
+	if [ ! -e $subDir/$task/epiWarped_blur6mm.nii.gz ]; then
+		qsub $baseDir/epi_minProc_DBIS.sh $sub $task 1
+	fi
+done
+
+### Now run freesurfer
 if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	###Prep for Freesurfer with PreSkull Stripped
 	#Citation: followed directions from https://surfer.nmr.mgh.harvard.edu/fswiki/UserContributions/FAQ (search skull)
@@ -167,7 +177,7 @@ if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	#recon-all -autorecon2 -autorecon3 -s $sub -openmp $threads
 	recon-all -s $sub -localGI -openmp $threads
 	### Add freesurfer values to Master files
-	MasterDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/testing/
+	MasterDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/
 	for file in `ls $MasterDir/FreeSurfer_[aBw]*csv`; do
 		# check for old values in master files and delete if found
 		lineNum=$(grep -n $sub $file | cut -d: -f1);
@@ -256,12 +266,6 @@ rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}Tem
 rm -r ${antDir}/tmp ${freeDir}/SUMA/${sub}_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.*
 gzip ${freeDir}/SUMA/*.nii 
 
-### Now run EPI preprocessing (if it has not been done; this should only happen in the case where we are re-running this script to add something like CT etc)
-for task in faces stroop mid facename; do
-	if [ ! -e $subDir/$task/epiWarped_blur6mm.nii.gz ]; then
-		qsub $baseDir/epi_minProc_DBIS.sh $sub $task 1
-	fi
-done
  
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 
