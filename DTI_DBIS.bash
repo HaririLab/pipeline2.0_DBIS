@@ -31,12 +31,18 @@
 
 ## Initialize variables 
 SUBJ=$1          												# This is the full subject folder name under Data
+INITRAND=$2	# add this option for using initrand when doing test / retest subjects (see call to eddy below)
 EXPERIMENT=`findexp DBIS.01`									# This will give the full path to ../Hariri/DBIS.01
-OUTDIR=$EXPERIMENT/Analysis/All_Imaging/$SUBJ/DTI		        # This is the location of the subject's output directory
+if [[ $INITRAND == "initrand" ]]; then 
+  OUTDIR=$EXPERIMENT/Analysis/All_Imaging/$SUBJ/DTI_initrand;		        # This is the location of the subject's output directory
+else
+  OUTDIR=$EXPERIMENT/Analysis/All_Imaging/$SUBJ/DTI;		        # This is the location of the subject's output directory
+fi
 DATADIR=$EXPERIMENT/Data/OTAGO/$SUBJ/DMHDS	         			# This is the location of the subject's raw data directory
 TEMPLATEDIR=$EXPERIMENT/Analysis/DTI/ENIGMA_templates			# This is where ENIGMA templates are stored
 CONFIGDIR=$EXPERIMENT/Scripts/pipeline2.0_DBIS/config			# This is where the config files for topup and eddy are stored
-MasterFile=$EXPERIMENT/Data/ALL_DATA_TO_USE/testing/DTI_ENIGMA_ROIs_averageFA.csv
+prefix=$(basename $OUTDIR)
+MasterFile=$EXPERIMENT/Data/ALL_DATA_TO_USE/Imaging/${prefix}_ENIGMA_ROIs_averageFA.csv
 export PATH=${EXPERIMENT/DBIS/DNS}/Scripts/Tools/mricrogl_lx:$PATH # need this for a copy of dcm2niix that works properly
 export FSLPATH=/usr/local/packages/fsl-5.0.9/
 
@@ -97,7 +103,11 @@ bet topup_corrected topup_corrected_brain -m -c 48 58 26
 # export PATH=${EXPERIMENT/DBIS/DNS}/Scripts/Tools/FSL/fsl-5.0.10/fsl/bin:$PATH
 # which eddy_openmp
 # eddy_openmp --initrand=true --imain=AP_MDDW/AP_MDDW --mask=topup_corrected_brain_mask.nii.gz --acqp=$CONFIGDIR/DTI_params.txt --index=$CONFIGDIR/DTI_index.txt --bvecs=AP_MDDW/AP_MDDW.bvec --bvals=AP_MDDW/AP_MDDW.bval --topup=topup_b0_ALL --out=eddy_corrected_data --mb=3 --repol --ol_type=both
-eddy_openmp --initrand=true --imain=AP_MDDW/AP_MDDW --mask=topup_corrected_brain_mask.nii.gz --acqp=$CONFIGDIR/DTI_params.txt --index=$CONFIGDIR/DTI_index.txt --bvecs=AP_MDDW/AP_MDDW.bvec --bvals=AP_MDDW/AP_MDDW.bval --topup=topup_b0_ALL --out=eddy_corrected_data 
+if [[ $INITRAND == "initrand" ]]; then
+  eddy --initrand=true --imain=AP_MDDW/AP_MDDW --mask=topup_corrected_brain_mask.nii.gz --acqp=$CONFIGDIR/DTI_params.txt --index=$CONFIGDIR/DTI_index.txt --bvecs=AP_MDDW/AP_MDDW.bvec --bvals=AP_MDDW/AP_MDDW.bval --topup=topup_b0_ALL --out=eddy_corrected_data 
+else
+  eddy_openmp --imain=AP_MDDW/AP_MDDW --mask=topup_corrected_brain_mask.nii.gz --acqp=$CONFIGDIR/DTI_params.txt --index=$CONFIGDIR/DTI_index.txt --bvecs=AP_MDDW/AP_MDDW.bvec --bvals=AP_MDDW/AP_MDDW.bval --topup=topup_b0_ALL --out=eddy_corrected_data --mb=3 --repol --ol_type=both
+fi
 
 ## use fsl's dtifit to fit tensors
 dtifit -k eddy_corrected_data.nii.gz -m topup_corrected_brain_mask.nii.gz -o fitted_data -r AP_MDDW/AP_MDDW.bvec -b AP_MDDW/AP_MDDW.bval
@@ -147,25 +157,52 @@ tail -1 $OUTDIR/stats/ROIout_L_UF.csv >> $OUTDIR/stats/ROIout.csv
 tail -1 $OUTDIR/stats/ROIout_R_UF.csv >> $OUTDIR/stats/ROIout.csv
 rm $OUTDIR/stats/ROIout_*_UF.csv
 
-# print ROI values to master file
-lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
-if [ $lineNum -gt 0 ]; then
-	# delete old line from file
-	sed -i "${lineNum}d" $MasterFile
-	sed -i "${lineNum}d" ${MasterFile/averageFA/nVoxels}
-fi
-vals1=$(tail -n +2 $OUTDIR/stats/ROIout.csv | cut -d, -f2 )
-vals2=$(tail -n +2 $OUTDIR/stats/ROIout.csv | cut -d, -f3 )
-echo $SUBJ,$vals1 | sed 's/ /,/g' >> $MasterFile
-echo $SUBJ,$vals2 | sed 's/ /,/g' >> ${MasterFile/averageFA/nVoxels}
-# print max RMS value to master file
-lineNum=$(grep -n $SUBJ ${MasterFile/ENIGMA_ROIs_averageFA/maxRMS} | cut -d: -f1);
-if [ $lineNum -gt 0 ]; then sed -i "${lineNum}d" ${MasterFile/ENIGMA_ROIs_averageFA/maxRMS}; fi; # delete old line from file
-list=$(awk '{print $2}' $OUTDIR/eddy_corrected_data.eddy_movement_rms); 
-max=$(echo "${list[*]}" | sort -nr | head -n1); 
-echo "$SUBJ,$max" >> ${MasterFile/ENIGMA_ROIs_averageFA/maxRMS}
-
+# print ROI values to master file, using a lock dir system to make sure only one process is trying to do this at a time
+if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
+while true; do
+  if  mkdir $HOME/locks/DTI; then
+	sleep 5  # seems like this is necessary to make sure any other processes have finished
+    for file in $MasterFile ${MasterFile/averageFA/nVoxels} ${MasterFile/ENIGMA_ROIs_averageFA/QC}; do
+		lineNum=$(grep -n $SUBJ $file | cut -d: -f1);
+		if [ $lineNum -gt 0 ]; then sed -i "${lineNum}d" $file; fi # delete old line from file
+	done
+	vals1=$(tail -n +2 $OUTDIR/stats/ROIout.csv | cut -d, -f2 )
+	vals2=$(tail -n +2 $OUTDIR/stats/ROIout.csv | cut -d, -f3 )
+	echo $SUBJ,$vals1 | sed 's/ /,/g' >> $MasterFile
+	echo $SUBJ,$vals2 | sed 's/ /,/g' >> ${MasterFile/averageFA/nVoxels}
+	# print eddy QC stats to master file
+	lineNum=$(grep -n $SUBJ ${MasterFile/ENIGMA_ROIs_averageFA/QC} | cut -d: -f1);
+	if [ $lineNum -gt 0 ]; then sed -i "${lineNum}d" ${MasterFile/ENIGMA_ROIs_averageFA/QC}; fi; # delete old line from file
+	rms_list=$(awk '{print $2}' $OUTDIR/eddy_corrected_data.eddy_movement_rms); 
+	rms_max=$(echo "${rms_list[*]}" | sort -nr | head -n1); 
+	rrms_list=$(awk '{print $2}' $subj/DTI/eddy_corrected_data.eddy_restricted_movement_rms); 
+	rrms_max=$(echo "${rrms_list[*]}" | sort -nr | head -n1); 
+	str=$SUBJ,$rms_max,$rrms_max
+	for thr in 0 4 9; do
+		flaggedSliceSums=$(awk '{ for(i=1; i<=NF;i++) j+=$i; print j; j=0 }' $id/DTI/eddy_corrected_data.eddy_outlier_map | tail -71)
+		nVolumesAboveThr=0; for i in `echo $flaggedSliceSums`; do if [[ $i -gt $thr ]]; then nVolumesAboveThr=$((nVolumesAboveThr+1)); fi; done; 
+		str=$str,$nVolumesAboveThr 
+	done	
+	echo "$str" >> ${MasterFile/ENIGMA_ROIs_averageFA/QC}
+        rm -r $HOME/locks/DTI
+        break
+  else
+    sleep 2
+  fi
+done
 cd $OUTDIR
+
+
+pre=/home/ark19/linux/experiments/DBIS.01//Data/ALL_DATA_TO_USE/Imaging/DTI_
+id=$1
+
+str=$(grep $id ${pre}maxRMS.csv);
+
+
+
+echo $str >> ${pre}QC.csv
+
+
 
 ## print normalized FA image to png for easy visual inspection
 num=25; for i in `seq 1 10`; do slicer FA/fitted_data_FA_FA_to_target_masked.nii.gz -x -$num x$num.png; num=$((num+10)); done
@@ -217,7 +254,7 @@ rm y*png
 pngappend MD_cor.png - MD_sag.png - MD_ax.png MD_normalized_ENIGMA.png
 rm MD_cor.png; rm MD_sag.png; rm MD_ax.png 
 
-## print final skeleton image to png for easy visual inspection using slicer with -a option to print each view; this is hella easier than the other FA/MD vis checking code but leave that for now
+# print final skeleton image to png for easy visual inspection using slicer with -a option to print each view; this is hella easier than the other FA/MD vis checking code but leave that for now
 slicer $OUTDIR/stats/fitted_data_FA_FA_to_target_masked_FAskel.nii.gz -a Final_Skeleton.png
 
 ## Clean Up
@@ -228,6 +265,7 @@ rm AP_MDDW/*nii.gz
 rm PA/*nii.gz
 rm FA/target.nii.gz
 rm FA/fitted_data_FA_FA_to_target.nii.gz
+rm eddy_corrected_data.eddy_outlier_free_data.nii.gz # this is just the data with the outliers replaced (NOT eddy corrected)
 rm fitted_data_MD_to_target.nii.gz
 rm b0*nii.gz
 rm -r origdata # this just contains fitted_data_FA.nii.gz, which is the same as FA/fitted_data_FA_FA.nii.gz except not masked
@@ -235,6 +273,8 @@ rm -r origdata # this just contains fitted_data_FA.nii.gz, which is the same as 
 rm stats/all_FA*
 rm stats/mean_FA*
 # rm eddy_corrected_data.nii.gz ????????????? it's huge but might need it (135MB)
+# unzip final normalized FA file to allow for use in SPM
+gunzip FA/fitted_data_FA_FA_to_target_masked.nii.gz
 
 mkdir QA
 mv *png QA
