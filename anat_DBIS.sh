@@ -175,48 +175,7 @@ if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	#cp ${freeDir}/mri/T1.mgz ${freeDir}/mri/brainmask.auto.mgz
 	#cp ${freeDir}/mri/brainmask.auto.mgz ${freeDir}/mri/brainmask.mgz
 	#recon-all -autorecon2 -autorecon3 -s $sub -openmp $threads
-	recon-all -s $sub -localGI -openmp $threads
-	### Add freesurfer values to Master files, using a lock dir system to make sure only one process is doing this at a time
-	MasterDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/
-	if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
-	while true; do
-		if mkdir $HOME/locks/freesurfer; then
-			sleep 5 # seems like this is necessary to make sure any other processes have fully finished		
-			for file in `ls $MasterDir/FreeSurfer_[aBw]*csv`; do
-				# check for old values in master files and delete if found
-				lineNum=$(grep -n $sub $file | cut -d: -f1);
-				if [ $lineNum -gt 0 ]; then
-					sed -i "${lineNum}d" $file
-				fi
-			done
-			for f in `ls $freeDir/stats/lh*stats $freeDir/stats/[aw]*stats`; do
-				if [ $f != $freeDir/stats/lh.curv.stats ]; then # this file is different so skip it
-					measures=`grep "ColHeaders" $f | cut -d" " -f3-`; # skip first "#" and "ColHeaders" so col numbers line up with data
-					fname=${f/$freeDir\/stats\//}
-					fname_short=${fname/lh./}
-					i=1; 
-					for measure in $measures; do 
-						if [ $measure != StructName ] && [ $measure != Index ] && [ $measure != SegId ]; then 
-							vals_L=`grep -v "#" $freeDir/stats/${fname} | awk -v colnum=$i '{print $colnum}'`; 
-							str_L=$(echo $sub,$vals_L | sed 's/ /,/g')
-							if [[ $f == *"/lh."* ]]; then
-								vals_R=`grep -v "#" $freeDir/stats/${fname/lh/rh} | awk -v colnum=$i '{print $colnum}'`; 
-								str_R=$(echo $vals_R | sed 's/ /,/g')
-								echo $str_L,$str_R	>> ${MasterDir}FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
-							else
-								echo $str_L	>> ${MasterDir}FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
-							fi
-						fi; 
-						i=$((i+1)); 
-					done
-				fi
-			done	
-			rm -r $HOME/locks/freesurfer
-			break
-		else
-			sleep 2
-		fi
-	done			
+	recon-all -s $sub -localGI -openmp $threads			
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!Skipping FreeSurfer, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -233,6 +192,47 @@ if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
 		echo ""
 		recon-all -subject $sub -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
 		rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
+		### Now add freesurfer values to Master files, using a lock dir system to make sure only one process is doing this at a time
+		MasterDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/
+		if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
+		while true; do
+			if mkdir $HOME/locks/freesurfer; then
+				sleep 5 # seems like this is necessary to make sure any other processes have fully finished		
+				for file in `ls $MasterDir/FreeSurfer_[aBw]*csv`; do
+					# check for old values in master files and delete if found
+					lineNum=$(grep -n $sub $file | cut -d: -f1);
+					if [ $lineNum -gt 0 ]; then
+						sed -i "${lineNum}d" $file
+					fi
+				done
+				for f in `ls $freeDir/stats/lh*stats $freeDir/stats/[aw]*stats`; do
+					if [ $f != $freeDir/stats/lh.curv.stats ]; then # this file is different so skip it
+						measures=`grep "ColHeaders" $f | cut -d" " -f3-`; # skip first "#" and "ColHeaders" so col numbers line up with data
+						fname=${f/$freeDir\/stats\//}
+						fname_short=${fname/lh./}
+						i=1; 
+						for measure in $measures; do 
+							if [ $measure != StructName ] && [ $measure != Index ] && [ $measure != SegId ]; then 
+								vals_L=`grep -v "#" $freeDir/stats/${fname} | awk -v colnum=$i '{print $colnum}'`; 
+								str_L=$(echo $sub,$vals_L | sed 's/ /,/g')
+								if [[ $f == *"/lh."* ]]; then
+									vals_R=`grep -v "#" $freeDir/stats/${fname/lh/rh} | awk -v colnum=$i '{print $colnum}'`; 
+									str_R=$(echo $vals_R | sed 's/ /,/g')
+									echo $str_L,$str_R	>> ${MasterDir}FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
+								else
+									echo $str_L	>> ${MasterDir}FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
+								fi
+							fi; 
+							i=$((i+1)); 
+						done
+					fi
+				done	
+				rm -r $HOME/locks/freesurfer
+				break
+			else
+				sleep 2
+			fi
+		done	
 	fi
 fi
 #Run SUMA
