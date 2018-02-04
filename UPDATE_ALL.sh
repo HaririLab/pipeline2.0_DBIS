@@ -3,6 +3,16 @@
 baseDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01
 scriptDir=$baseDir/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
 logFile=$baseDir/Analysis/All_Imaging/LOG.csv
+masterDir=$baseDir/Data/ALL_DATA_TO_USE/Imaging/
+
+# copy master stats files from dir that is for script to write to only to dir that is for people to use; 
+##could also use something like ls --ignore '*QC*' for the non-QC files?
+echo "************************** Copying master stats files ***************************************"
+cp $masterDir/x_x.KEEP.OUT.x_x/*QC* $masterDir/QC
+cp $masterDir/x_x.KEEP.OUT.x_x/BOLD_R* $masterDir
+cp $masterDir/x_x.KEEP.OUT.x_x/DTI_E* $masterDir
+cp $masterDir/x_x.KEEP.OUT.x_x/Free* $masterDir
+cp $masterDir/x_x.KEEP.OUT.x_x/VBM* $masterDir
 
 cd $baseDir/Data/OTAGO
 

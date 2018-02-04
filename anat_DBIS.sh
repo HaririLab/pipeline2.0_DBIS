@@ -193,7 +193,7 @@ if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
 		recon-all -subject $sub -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
 		rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
 		### Now add freesurfer values to Master files, using a lock dir system to make sure only one process is doing this at a time
-		MasterDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/
+		MasterDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x
 		if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
 		while true; do
 			if mkdir $HOME/locks/freesurfer; then

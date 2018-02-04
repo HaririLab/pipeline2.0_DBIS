@@ -8,12 +8,17 @@
 
 BASEDIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
-TASKDIR=stroop_redo
+TASKDIR=stroop
 BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/fMRI_Behavioral/Stroop.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
+MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/BOLD_ROImeans_stroop_$runname.csv
 
 SUBJ=$1;
+maskfile=${BASEDIR}/Analysis/Max/templates/DBIS115/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
+outname=glm_output
+nTRs=209;
+
 echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $SUBJ START [`date`] on HOST [$HOSTNAME]----"
 
 ###### Read behavioral data ######
@@ -38,7 +43,6 @@ fi
 mkdir -p $OUTDIR/$SUBJ/$TASKDIR/$runname/contrasts
 
 # create FD and DVARS outlier file to use for censoring
-nTRs=209;
 if [ "$SUBJ" == "DMHDS0234" ]; then nTRs=208; fi
 echo "nTRs: $nTRs"
 for i in `seq $nTRs`; do 
@@ -68,8 +72,7 @@ elif [ $((any_incorrect_con+any_incorrect_incon)) -eq 2 ]; then
 fi
 
 cd $OUTDIR/$SUBJ/$TASKDIR/$runname
-maskfile=${BASEDIR}/Analysis/Max/templates/DBIS115/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
-outname=glm_output
+
 # arguments to stim_times are in seconds!
 # glt arg should always be 1
 # using polort 3 here per recommendation in afni_proc.py help documentation
@@ -118,10 +121,32 @@ rm ${outname}_Rerrts_sd.nii.gz
 gzip ${outname}_tstats.nii
 rm ${outname}.nii   ### this file contains coef, fstat, and tstat for each condition and contrast, so since we are saving coefs and tstats separately for SPM, i think the only thing we lose here is fstat, which we probably dont want anyway
 
+# extract ROI means to master file, using a lock dir system to make sure only one process does this at a time
+if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
+while true; do
+	if mkdir $HOME/locks/stroop; then
+		sleep 5 # seems like this is necessary to make sure any other processes are fully finsihed
+		# first check for old values in master files and delete if found
+		lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
+		if [ $lineNum -gt 0 ]; then	sed -i "${lineNum}d" $MasterFile; fi
+		rdir=$BASEDIR/Analysis/ROI/ACC
+		str=$SUBJ
+		for roi in ACC_AAL_L ACC_AAL_R dACC_0_9_48_5mm dACC_4_24_38_5mm dACC_BA32; do 
+		    vals=$(3dROIstats -nzmean -mask $rdir/$roi.nii $OUTDIR/$SUBJ/stroop/$runname/${outname}_coefs.nii | grep stroop | awk '{print $3}'); 
+		    str=$str,$(echo $vals | sed 's/ /,/g')
+		done; 
+		echo $str >> $MasterFile; 
+		rm -r $HOME/locks/stroop
+		break
+	else
+		sleep 2
+	fi
+done
+
 sh $BASEDIR/Scripts/pipeline2.0_DBIS/scripts/getConditionsCensored.bash $SUBJ stroop
 
 # do this for calculating censored conditions later
-grep -v "#" Decon.xmat.1D | grep "1" > Decon.xmat.1D.matOnly
+# # grep -v "#" Decon.xmat.1D | grep "1" > Decon.xmat.1D.matOnly
 
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 

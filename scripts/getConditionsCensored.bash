@@ -3,7 +3,7 @@
 id=$1
 task=$2
 EXPERIMENT=`findexp DBIS.01`									# This will give the full path to ../Hariri/DBIS.01
-MasterFile=$EXPERIMENT/Data/ALL_DATA_TO_USE/Imaging/BOLD_QC_${task}_nFramesKept.csv
+MasterFile=$EXPERIMENT/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/BOLD_QC_${task}_nFramesKept.csv
 
 adir=/home/ark19/linux/experiments/DBIS.01/Analysis/All_Imaging/
 

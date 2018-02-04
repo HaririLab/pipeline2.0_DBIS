@@ -11,7 +11,7 @@ OUTDIR=$BASEDIR/Analysis/All_Imaging/
 BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/fMRI_Behavioral/Facename.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
-MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/BOLD_ROImeans_facename_$runname.csv
+MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/BOLD_ROImeans_facename_$runname.csv
 
 SUBJ=$1;
 echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $SUBJ START [`date`] on HOST [$HOSTNAME]----"
