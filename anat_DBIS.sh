@@ -36,7 +36,7 @@ antDir=${subDir}/antCT
 freeDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/${sub}
 tmpDir=${antDir}/tmp
 antPre="highRes_" #pipenotes= Change away from HardCoding laterF
-templateDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/DBIS115 #pipenotes= update/Change away from HardCoding later
+templateDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/Templates #pipenotes= update/Change away from HardCoding later
 templatePre=dunedin115template_MNI #pipenotes= update/Change away from HardCoding later
 anatDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/
 flairDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_3D_SAG_FLAIR_FS-_1.2_mm/
@@ -46,13 +46,13 @@ threads=$2
 if [ ${#threads} -eq 0 ]; then threads=1; fi # antsRegistrationSyN won't work properly if $threads is empty
 # baseDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 baseDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
-export PATH=$PATH:${baseDir}/scripts/:/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/huginBin/bin/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
+export PATH=$PATH:${baseDir}/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
 export OMP_NUM_THREADS=$threads
 export SUBJECTS_DIR=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/
 export FREESURFER_HOME=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/freesurfer
 export ANTSPATH=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/ants-2.2.0/bin/
-export PATH=$PATH:${baseDir}/scripts/:${baseDir}/utils/:/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/ants-2.2.0/bin/
+export PATH=$PATH:${baseDir}/scripts/:${baseDir}/utils/:$ANTSPATH
 echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]----" 
 
 ##Set up directory
@@ -112,8 +112,10 @@ else
 	echo ""
 fi
 ##Smooth Cortical Thickness for 2nd level
-if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate_blur8mm.nii.gz ]];then
-	3dBlurInMask -input ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz -mask ${templateDir}/${templatePre}_AvgGMSegWarped25connected.nii.gz -FWHM 8 -prefix ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate_blur8mm.nii.gz
+# ARK updated this from FWHM 8 to 6 on 2/15/18 since that's what had been run in all DNS subjects (DNS used GMSegWarped30 but that shouldnt make much dif)
+if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate_blur6mm.nii ]];then
+	3dBlurInMask -input ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz -mask ${templateDir}/${templatePre}_AvgGMSegWarped25connected.nii.gz -FWHM 6 -prefix ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate_blur6mm.nii.gz
+	gunzip ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate_blur6mm.nii.gz # need to unzip so folks can use it in SPM
 fi
 ###Make VBM and smooth
 if [[ ! -f ${antDir}/${antPre}JacModVBM_blur8mm.nii.gz ]] && [[ ! -f ${antDir}/${antPre}JacModVBM_blur8mm.nii ]];then
