@@ -30,29 +30,29 @@
 # -- END GLOBAL DIRECTIVE -- 
 
 sub=$1 #$1 or flag -s  #20161103_21449 #pipenotes= Change away from HardCoding later 
-subDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
+subDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
 QADir=${subDir}/QA
 antDir=${subDir}/antCT
-freeDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/${sub}
+freeDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/${sub}
 tmpDir=${antDir}/tmp
 antPre="highRes_" #pipenotes= Change away from HardCoding laterF
-templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/DBIS115 #pipenotes= update/Change away from HardCoding later
+templateDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/DBIS115 #pipenotes= update/Change away from HardCoding later
 templatePre=dunedin115template_MNI #pipenotes= update/Change away from HardCoding later
-anatDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/
-flairDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_3D_SAG_FLAIR_FS-_1.2_mm/
-graphicsDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Graphics/Brain_Images/ReadyToProcess/
-#T1=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
+anatDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/
+flairDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_3D_SAG_FLAIR_FS-_1.2_mm/
+graphicsDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Graphics/Brain_Images/ReadyToProcess/
+#T1=$2 #/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
 threads=$2
 if [ ${#threads} -eq 0 ]; then threads=1; fi # antsRegistrationSyN won't work properly if $threads is empty
 # baseDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-baseDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
-export PATH=$PATH:${baseDir}/scripts/:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/huginBin/bin/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
+baseDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
+export PATH=$PATH:${baseDir}/scripts/:/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/huginBin/bin/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
 export OMP_NUM_THREADS=$threads
-export SUBJECTS_DIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/
-export FREESURFER_HOME=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/freesurfer
-export ANTSPATH=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/ants-2.2.0/bin/
-export PATH=$PATH:${baseDir}/scripts/:${baseDir}/utils/:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/ants-2.2.0/bin/
+export SUBJECTS_DIR=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/
+export FREESURFER_HOME=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/freesurfer
+export ANTSPATH=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/ants-2.2.0/bin/
+export PATH=$PATH:${baseDir}/scripts/:${baseDir}/utils/:/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/ants-2.2.0/bin/
 echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]----" 
 
 ##Set up directory
@@ -79,7 +79,7 @@ if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];th
 	if [ ${#bestT1} -eq 0 ]; then
 		echo "!!!!!!!!!!!!!!!!!!!! No output from Dimon t1 import, attempting with dcm2niix !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 		firstDcm=$(ls ${anatDir}/1.3.12.2.1107.5.2.19* | head -1)
-		/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Scripts/Tools/mricrogl_lx/dcm2niix -o ${tmpDir} ${firstDcm}
+		/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Scripts/Tools/mricrogl_lx/dcm2niix -o ${tmpDir} ${firstDcm}
 		gzip ${tmpDir}/MR*nii
 		bestT1=$(ls ${tmpDir}/MR*nii.gz | tail -n1)
 	fi
@@ -166,7 +166,7 @@ if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	#echo "mris_inflate -n 15" > ${tmpDir}/expert.opts
 	#Run
 	rm -r ${freeDir}
-	cd /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/
+	cd /mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/
 	#mksubjdirs ${sub}
 	#cp -R ${FREESURFER_HOME}/subjects/fsaverage ${subDir}/
 	echo $freeDir
@@ -193,7 +193,7 @@ if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
 		recon-all -subject $sub -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
 		rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
 		### Now add freesurfer values to Master files, using a lock dir system to make sure only one process is doing this at a time
-		MasterDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x
+		MasterDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x
 		if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
 		while true; do
 			if mkdir $HOME/locks/freesurfer; then
@@ -265,9 +265,9 @@ if [ $found -eq 0 ]; then
 fi
 
 ### copy files for vis check
-cp ${QADir}/anat.BrainExtractionCheckAxial.png /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/anat.BrainExtractionCheckAxial/$sub.png
-cp ${QADir}/anat.BrainExtractionCheckSag.png /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/anat.BrainExtractionCheckSag/$sub.png
-cp ${QADir}/anat.antCTCheck.png /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/anat.antCTCheck/$sub.png
+cp ${QADir}/anat.BrainExtractionCheckAxial.png /mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/anat.BrainExtractionCheckAxial/$sub.png
+cp ${QADir}/anat.BrainExtractionCheckSag.png /mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/anat.BrainExtractionCheckSag/$sub.png
+cp ${QADir}/anat.antCTCheck.png /mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/anat.antCTCheck/$sub.png
 
 #cleanup
 #mv highRes_* antCT/ #pipeNotes: add more deletion and clean up to minimize space, think about deleting Freesurfer and some of SUMA output

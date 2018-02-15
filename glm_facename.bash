@@ -6,7 +6,7 @@
 #$ -l h_vmem=12G 
 # -- END GLOBAL DIRECTIVE -- 
 
-BASEDIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/
+BASEDIR=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
 BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/fMRI_Behavioral/Facename.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds

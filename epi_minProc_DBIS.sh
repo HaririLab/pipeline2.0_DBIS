@@ -32,20 +32,20 @@
 
 sub=$1 #$1 or flag -s  #20161103_21449 #pipenotes= Change away from HardCoding later 
 task=$2
-scriptDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
-subDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
+scriptDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
+subDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
 QADir=${subDir}/QA
-outDir=${subDir}/${task}_redo
+outDir=${subDir}/${task}
 tmpDir=${outDir}/tmp
 antDir=${subDir}/antCT
 freeDir=${subDir}/FreeSurfer
 antPre="highRes_"
-templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/DBIS115 #pipenotes= update/Change away from HardCoding later
+templateDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/DBIS115 #pipenotes= update/Change away from HardCoding later
 templatePre=dunedin115template_MNI_ #pipenotes= update/Change away from HardCoding later
-#T1=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
+#T1=$2 #/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
 threads=$3
 if [ ${#threads} -eq 0 ]; then threads=1; fi 
-fieldMapDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_gre_field_mapping_2mm/
+fieldMapDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_gre_field_mapping_2mm/
 export PATH=$PATH:$scriptDir/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
 export OMP_NUM_THREADS=$threads
@@ -57,25 +57,25 @@ echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]--
 	# # echo "#########################################################################################################"
 	# # echo "###################### Processed anatomical not found, running anat_DBIS.sh #############################"
 	# # echo "#########################################################################################################"
-	# # sh /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Scripts/NewPipeline/anat_DBIS.sh $sub 1
+	# # sh /mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Scripts/NewPipeline/anat_DBIS.sh $sub 1
 # # fi
 
 ##Grab Epi and set up directories
 
 if [[ $task == "faces" ]];then
-	epiDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_matching
+	epiDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_matching
 	expLen=200
 elif [[ $task == "mid" ]];then
-	epiDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_quick_strike
+	epiDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_quick_strike
 	expLen=232
 elif [[ $task == "stroop" ]];then
-	epiDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_colours
+	epiDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_colours
 	expLen=209
 elif [[ $task == "facename" ]];then
-	epiDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_name_game
+	epiDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_name_game
 	expLen=172
 elif [[ $task == "rest" ]];then
-	epiDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_resting_state
+	epiDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_resting_state
 	expLen=248
 else
 		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -285,7 +285,7 @@ CreateTiledMosaic -i ${tmpDir}/epiPreb0.nii.gz -r ${tmpDir}/epiPreb0.nii.gz -o $
 CreateTiledMosaic -i ${tmpDir}/epiPostb0.nii.gz -r ${tmpDir}/epiPostb0.nii.gz -o ${QADir}/${task}.postB0.png -a 0 -t -1x-1 -d 2 -p mask -s [15,0,120] -x ${tmpDir}/epiPostb0.nii.gz -f 0x1 -p 0
 
 ### copy files for vis check
-cp ${QADir}/$task.epi2TemplateAlignmentCheck.png /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/$task.epi2TemplateAlignmentCheck/$sub.png
+cp ${QADir}/$task.epi2TemplateAlignmentCheck.png /mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/$task.epi2TemplateAlignmentCheck/$sub.png
 
 ##Clean up
 rm -r $tmpDir

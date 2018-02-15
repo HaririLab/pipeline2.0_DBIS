@@ -42,7 +42,7 @@ DATADIR=$EXPERIMENT/Data/OTAGO/$SUBJ/DMHDS	         			# This is the location of
 TEMPLATEDIR=$EXPERIMENT/Analysis/DTI/ENIGMA_templates			# This is where ENIGMA templates are stored
 CONFIGDIR=$EXPERIMENT/Scripts/pipeline2.0_DBIS/config			# This is where the config files for topup and eddy are stored
 prefix=$(basename $OUTDIR)
-MasterFile=$EXPERIMENT/Data/ALL_DATA_TO_USE/Imaging/${prefix}_ENIGMA_ROIs_averageFA.csv
+MasterFile=$EXPERIMENT/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/${prefix}_ENIGMA_ROIs_averageFA.csv
 export PATH=${EXPERIMENT/DBIS/DNS}/Scripts/Tools/mricrogl_lx:$PATH # need this for a copy of dcm2niix that works properly
 export FSLPATH=/usr/local/packages/fsl-5.0.9/
 

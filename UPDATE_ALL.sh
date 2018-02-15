@@ -1,6 +1,6 @@
 #!/bin/sh
 
-baseDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01
+baseDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01
 scriptDir=$baseDir/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
 logFile=$baseDir/Analysis/All_Imaging/LOG.csv
 masterDir=$baseDir/Data/ALL_DATA_TO_USE/Imaging/
@@ -23,7 +23,7 @@ for SUBJ in `ls -d DMHDS[01]*`; do
 	
 		outDir=$baseDir/Analysis/All_Imaging/$SUBJ
 		antDir=${outDir}/antCT
-		freeDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/${SUBJ}
+		freeDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/${SUBJ}
 
 		submitted=0;
 
