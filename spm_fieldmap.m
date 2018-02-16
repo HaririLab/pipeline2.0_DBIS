@@ -16,11 +16,11 @@
 % fprintf('\n**Note: MATLAB:dispatcher:nameConflict warnings have been suppressed**\n');
 
 % % Add necessary paths for BIAC, then SPM and data folders
-spmPath = '/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Scripts/Tools/spm12'; addpath(genpath(spmPath));
+spmPath = '/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Scripts/Tools/spm12'; addpath(genpath(spmPath));
 
 %Here we set some directory variables to make navigation easier
-homedir='/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/'; 
-datadir='/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/';
+homedir='/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/'; 
+datadir='/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/';
 
 % spm('defaults','fmri');spm_jobman('initcfg');                               % Initialize SPM JOBMAN
 
