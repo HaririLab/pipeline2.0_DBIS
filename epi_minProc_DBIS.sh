@@ -40,7 +40,7 @@ tmpDir=${outDir}/tmp
 antDir=${subDir}/antCT
 freeDir=${subDir}/FreeSurfer
 antPre="highRes_"
-templateDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/DBIS115 #pipenotes= update/Change away from HardCoding later
+templateDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/Templates #pipenotes= update/Change away from HardCoding later
 templatePre=dunedin115template_MNI_ #pipenotes= update/Change away from HardCoding later
 #T1=$2 #/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
 threads=$3
@@ -209,9 +209,11 @@ antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtv.nii.gz -o ${outDir}/epiWarped
 3drefit -space MNI -view tlrc ${outDir}/epiWarped.nii.gz #Refit space of warped epi so that it can be viewed in MNI space within AFNI
 
 #####Smooth Data 6mm will get output to about 11-13 FWHM on average
-3dBlurInMask -input ${outDir}/epiWarped.nii.gz -mask ${templateDir}/${templatePre}BrainExtractionMask_2mmDil1.nii.gz -FWHM 6 -prefix ${tmpDir}/epiWarped_blur6mm.nii.gz ##comments: Decided again a more restricted blur in mask with different compartments for cerebellum etc, because that approach seemed to be slighly harming tSNR actually and did not help with peak voxel or extent analyses when applied to Faces contrast. Decided to use a dilated Brain Extraction mask because this at least gets rid of crap that is way outside of brain. This saves space (slightly) and aids with cleaner visualizations. A GM mask can still later be applied for group analyses, this way we at least leave that up to the user.
-3dTstat -prefix ${tmpDir}/mean.epiWarped_blur6mm.nii.gz ${tmpDir}/epiWarped_blur6mm.nii.gz
-3dcalc -a ${tmpDir}/epiWarped_blur6mm.nii.gz -b ${tmpDir}/mean.epiWarped_blur6mm.nii.gz -expr 'min(200, a/b*100)*step(a)*step(b)' -prefix ${outDir}/epiWarped_blur6mm.nii.gz ##pipenotes: this is scaling all values to have comparaple beta weights across subjects. Make sure to indicate in wiki entry that the unblurred data is not scaled!!!! Also the scaling was motivated by this post #citation: https://afni.nimh.nih.gov/pub/dist/edu/data/CD.expanded/AFNI_data6/FT_analysis/tutorial/t14_scale.txt and is not being done for rest currently.  
+if [[ $task != "rest" ]];then
+	3dBlurInMask -input ${outDir}/epiWarped.nii.gz -mask ${templateDir}/${templatePre}BrainExtractionMask_2mmDil1.nii.gz -FWHM 6 -prefix ${tmpDir}/epiWarped_blur6mm.nii.gz ##comments: Decided again a more restricted blur in mask with different compartments for cerebellum etc, because that approach seemed to be slighly harming tSNR actually and did not help with peak voxel or extent analyses when applied to Faces contrast. Decided to use a dilated Brain Extraction mask because this at least gets rid of crap that is way outside of brain. This saves space (slightly) and aids with cleaner visualizations. A GM mask can still later be applied for group analyses, this way we at least leave that up to the user.
+	3dTstat -prefix ${tmpDir}/mean.epiWarped_blur6mm.nii.gz ${tmpDir}/epiWarped_blur6mm.nii.gz
+	3dcalc -a ${tmpDir}/epiWarped_blur6mm.nii.gz -b ${tmpDir}/mean.epiWarped_blur6mm.nii.gz -expr 'min(200, a/b*100)*step(a)*step(b)' -prefix ${outDir}/epiWarped_blur6mm.nii.gz ##pipenotes: this is scaling all values to have comparaple beta weights across subjects. Make sure to indicate in wiki entry that the unblurred data is not scaled!!!! Also the scaling was motivated by this post #citation: https://afni.nimh.nih.gov/pub/dist/edu/data/CD.expanded/AFNI_data6/FT_analysis/tutorial/t14_scale.txt and is not being done for rest currently.  
+fi
 
 echo ""
 echo "#########################################################################################################"
