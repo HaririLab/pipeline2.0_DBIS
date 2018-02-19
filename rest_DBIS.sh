@@ -26,7 +26,7 @@
 # --- BEGIN GLOBAL DIRECTIVE -- 
 #$ -o $HOME/$JOB_NAME.$JOB_ID.out
 #$ -e $HOME/$JOB_NAME.$JOB_ID.out
-#$ -l h_vmem=16G 
+#$ -l h_vmem=12G 
 # -- END GLOBAL DIRECTIVE -- 
 
 sub=$1
@@ -41,6 +41,8 @@ antDir=${subDir}/antCT
 antPre="highRes_" #pipenotes= Change away from HardCoding later
 FDthresh=.25 #pipenotes= Change away from HardCoding later, also find citations for what you decide likely power 2014, minimun of .5 fd 20DVARS suggested
 DVARSthresh=1.55 #pipenotes= Change away from HardCoding later, also find citations for what you decide
+
+echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]----"
 
 mkdir -p $tmpDir
 ##Nest minProc within overarching rest directory
@@ -84,7 +86,7 @@ cat ${tmpOutDir}/FDcensorTRs.1D ${tmpOutDir}/DVARScensorTRs.1D | sort -g | uniq 
 
 ####Project everything out
 ####################### replaced allmotion.1D with motion_spm_deg.1D and allmotion_deriv.1D with motion_deriv.1D
-clist=$(cat ${outDir}/censorTRs.1D)
+clist=$(cat ${tmpOutDir}/censorTRs.1D)
 lenC=$(echo $clist | wc -w )
 if [[ $lenC == 0 ]];then
 	3dTproject -input ${outDir}/epiWarped.nii.gz -mask ${templateDir}/${templatePre}BrainExtractionMask_2mmDil1.nii.gz  -prefix ${tmpOutDir}/epiPrepped_blur6mm.nii.gz -ort ${outDir}/motion_spm_deg.1D -ort ${outDir}/motion_deriv.1D -ort ${tmpOutDir}/pcRest.wm.csf_vec.1D -polort 1 -bandpass 0.008 0.10 -blur 6
@@ -95,8 +97,27 @@ else
 fi
 
 rm -r $tmpDir
-cp -r $tmpOutDir/* $outDir
-#pipenotes: Cen options in 3dTproject start at 0, currently ours based on awk start with 1. Make sure to subtract 1 before giving to tproject!!!!
+
+##Now copy all files to the server. 
+#Because we run into issues when too many processes are trying to do this in parallel, use a lock dir system to make sure that only a small number of processes are doing this step simultaneously
+N_allowed=3
+lockDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+if [ ! -e $lockDir ]; then mkdir $lockDir; fi
+break=0
+while true; do
+	for i in `seq 1 $N_allowed`; do
+		if mkdir $lockDir/writingBigFiles$i; then
+			cp -r $tmpOutDir/* $outDir 
+			rm -r $lockDir/writingBigFiles$i
+			break=1
+		fi
+	done
+	if [[ $break -eq 1 ]]; then
+		break
+	else
+		sleep 2
+	fi
+done
 
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 

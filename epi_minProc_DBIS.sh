@@ -295,6 +295,27 @@ cp ${QADir}/$task.epi2TemplateAlignmentCheck.png /mnt/BIAC/munin4.dhe.duke.edu/H
 rm -r $tmpDir
 cp -r $tmpOutDir/* $outDir
 
+##Now copy all files to the server. 
+#Because we run into issues when too many processes are trying to do this in parallel, use a lock dir system to make sure that only a small number of processes are doing this step simultaneously
+N_allowed=3
+lockDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+if [ ! -e $lockDir ]; then mkdir $lockDir; fi
+break=0
+while true; do
+	for i in `seq 1 $N_allowed`; do
+		if mkdir $lockDir/writingBigFiles$i; then
+			cp -r $tmpOutDir/* $outDir 
+			rm -r $lockDir/writingBigFiles$i
+			break=1
+		fi
+	done
+	if [[ $break -eq 1 ]]; then
+		break
+	else
+		sleep 2
+	fi
+done
+
 ##run first level model
 if [ $task != "rest" ]; then
 	qsub $scriptDir/glm_$task.bash $sub
