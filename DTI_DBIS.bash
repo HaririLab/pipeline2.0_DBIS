@@ -158,9 +158,10 @@ tail -1 $OUTDIR/stats/ROIout_R_UF.csv >> $OUTDIR/stats/ROIout.csv
 rm $OUTDIR/stats/ROIout_*_UF.csv
 
 # print ROI values to master file, using a lock dir system to make sure only one process is trying to do this at a time
-if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
+lockDir=$EXPERIMENT/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+if [ ! -e $lockDir ]; then mkdir $lockDir; fi
 while true; do
-  if  mkdir $HOME/locks/DTI; then
+  if  mkdir $lockDir/DTI; then
 	sleep 5  # seems like this is necessary to make sure any other processes have finished
     for file in $MasterFile ${MasterFile/averageFA/nVoxels} ${MasterFile/ENIGMA_ROIs_averageFA/QC}; do
 		lineNum=$(grep -n $SUBJ $file | cut -d: -f1);
@@ -184,25 +185,13 @@ while true; do
 		str=$str,$nVolumesAboveThr 
 	done	
 	echo "$str" >> ${MasterFile/ENIGMA_ROIs_averageFA/QC}
-        rm -r $HOME/locks/DTI
+        rm -r $lockDir/DTI
         break
   else
     sleep 2
   fi
 done
 cd $OUTDIR
-
-
-pre=/home/ark19/linux/experiments/DBIS.01//Data/ALL_DATA_TO_USE/Imaging/DTI_
-id=$1
-
-str=$(grep $id ${pre}maxRMS.csv);
-
-
-
-echo $str >> ${pre}QC.csv
-
-
 
 ## print normalized FA image to png for easy visual inspection
 num=25; for i in `seq 1 10`; do slicer FA/fitted_data_FA_FA_to_target_masked.nii.gz -x -$num x$num.png; num=$((num+10)); done

@@ -60,7 +60,7 @@ echo "0 0 0 0 0 -1 0.5 0.5 0 $fb0s " > $OUTDIR/$SUBJ/mid/$runname/contrasts/gain
 echo "0 0 0 0 0 -1 1 0 0 $fb0s " > $OUTDIR/$SUBJ/mid/$runname/contrasts/smGainAnt_gr_ctrlAnt.txt
 echo "0 0 0 0 0 -1 0 1 0 $fb0s " > $OUTDIR/$SUBJ/mid/$runname/contrasts/lgGainAnt_gr_ctrlAnt.txt
 
-maskfile=${BASEDIR}/Analysis/Max/templates/DBIS115/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
+maskfile=${BASEDIR}/Analysis/Templates/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
 outname=glm_output
 # arguments to stim_times are in seconds!
 # glt arg should always be 1
@@ -103,9 +103,10 @@ gzip ${outname}_tstats.nii
 rm ${outname}.nii  ### this file contains coef, fstat, and tstat for each condition and contrast, so since we are saving coefs and tstats separately for SPM, i think the only thing we lose here is fstat, which we probably dont want anyway
 
 # extract ROI means to master file, using a lock dir system to make sure only one process does this at a time
-if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
+lockDir=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+if [ ! -e $lockDir ]; then mkdir $lockDir; fi
 while true; do
-	if mkdir $HOME/locks/mid; then
+	if mkdir $lockDir/mid; then
 		sleep 5 # seems like this is necessary to make sure any other processes are fully finsihed
 		# first check for old values in master files and delete if found
 		lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
@@ -117,7 +118,7 @@ while true; do
 		    str=$str,$(echo $vals | sed 's/ /,/g')
 		done; 
 		echo $str >> $MasterFile; 
-		rm -r $HOME/locks/mid
+		rm -r $lockDir/mid
 		break
 	else
 		sleep 2

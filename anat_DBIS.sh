@@ -196,9 +196,10 @@ if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
 		rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
 		### Now add freesurfer values to Master files, using a lock dir system to make sure only one process is doing this at a time
 		MasterDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x
-		if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
+		lockDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+		if [ ! -e $lockDir ]; then mkdir $lockDir; fi
 		while true; do
-			if mkdir $HOME/locks/freesurfer; then
+			if mkdir $lockDir/freesurfer; then
 				sleep 5 # seems like this is necessary to make sure any other processes have fully finished		
 				for file in `ls $MasterDir/FreeSurfer_[aBw]*csv`; do
 					# check for old values in master files and delete if found
@@ -229,7 +230,7 @@ if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
 						done
 					fi
 				done	
-				rm -r $HOME/locks/freesurfer
+				rm -r $lockDir/freesurfer
 				break
 			else
 				sleep 2

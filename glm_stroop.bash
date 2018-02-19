@@ -15,7 +15,7 @@ runname=glm_AFNI
 MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/BOLD_ROImeans_stroop_$runname.csv
 
 SUBJ=$1;
-maskfile=${BASEDIR}/Analysis/Max/templates/DBIS115/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
+maskfile=${BASEDIR}/Analysis/Templates/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
 outname=glm_output
 nTRs=209;
 
@@ -122,9 +122,10 @@ gzip ${outname}_tstats.nii
 rm ${outname}.nii   ### this file contains coef, fstat, and tstat for each condition and contrast, so since we are saving coefs and tstats separately for SPM, i think the only thing we lose here is fstat, which we probably dont want anyway
 
 # extract ROI means to master file, using a lock dir system to make sure only one process does this at a time
-if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
+lockDir=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+if [ ! -e $lockDir ]; then mkdir $lockDir; fi
 while true; do
-	if mkdir $HOME/locks/stroop; then
+	if mkdir $lockDir/stroop; then
 		sleep 5 # seems like this is necessary to make sure any other processes are fully finsihed
 		# first check for old values in master files and delete if found
 		lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
@@ -136,7 +137,7 @@ while true; do
 		    str=$str,$(echo $vals | sed 's/ /,/g')
 		done; 
 		echo $str >> $MasterFile; 
-		rm -r $HOME/locks/stroop
+		rm -r $lockDir/stroop
 		break
 	else
 		sleep 2
@@ -144,9 +145,6 @@ while true; do
 done
 
 sh $BASEDIR/Scripts/pipeline2.0_DBIS/scripts/getConditionsCensored.bash $SUBJ stroop
-
-# do this for calculating censored conditions later
-# # grep -v "#" Decon.xmat.1D | grep "1" > Decon.xmat.1D.matOnly
 
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 

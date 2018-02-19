@@ -25,9 +25,10 @@ case $task in
 esac
 
 # write to master file, using a lock dir system to make sure only one processes does this at a time
-if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
+lockDir=$EXPERIMENT/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+if [ ! -e $lockDir ]; then mkdir $lockDir; fi
 while true; do 
-	if mkdir $HOME/locks/censor_$task; then
+	if mkdir $lockDir/censor_$task; then
 		sleep 5 # this seems necessary to make sure that any other processes have fully finished
 		# first check for old values in master file and delete if found
 		lineNum=$(grep -n $id $MasterFile | cut -d: -f1)
@@ -56,7 +57,7 @@ while true; do
 			str="$str,$ct"; 
 		done
 		echo $str >> $MasterFile
-		rm -r $HOME/locks/censor_$task
+		rm -r $lockDir/censor_$task
 		break
 	else
 		sleep 2

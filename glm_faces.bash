@@ -65,7 +65,7 @@ head -185 $OUTDIR/$SUBJ/faces/$runname/outliers.1D | tail -43 > $OUTDIR/$SUBJ/fa
 echo "0 0 -1 1" > $OUTDIR/$SUBJ/faces/$runname/contrasts/faceBlock_gr_shapesBlocks.txt
 
 cd $OUTDIR/$SUBJ/faces/$runname
-maskfile=${BASEDIR}/Analysis/Max/templates/DBIS115/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
+maskfile=${BASEDIR}/Analysis/Templates/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
 
 ## Faces block 1 > adjacent shapes blocks
 outname=glm_output_1
@@ -159,9 +159,10 @@ mv glm_output_${surp}_betas.nii.gz surprise_betas.nii.gz
 3dcalc -prefix faces_gr_shapes_avg.nii.gz  -a anger_betas.nii.gz'[2]' -b fear_betas.nii.gz'[2]' -c neutral_betas.nii.gz'[2]' -d surprise_betas.nii.gz'[2]' -expr '((a+b+c+d)/4)' 
 
 # extract ROI means to master file, using a lock dir system to make sure only one processes does this at a time 
-if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
+lockDir=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+if [ ! -e $lockDir ]; then mkdir $lockDir; fi
 while true; do
-	if mkdir $HOME/locks/faces; then
+	if mkdir $lockDir/faces; then
 		sleep 5 # seems like this is necessary to make sure any other processes have fully finished
 		# first check for old values in master files and delete if found
 		lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
@@ -175,7 +176,7 @@ while true; do
 		    done; 
 		done
 		echo $str >> $MasterFile; 
-		rm -r $HOME/locks/faces
+		rm -r $lockDir/faces
 		break
 	else
 		sleep 2

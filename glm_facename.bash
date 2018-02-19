@@ -54,7 +54,7 @@ echo "0 0 0 0 1 0 -1" > $OUTDIR/$SUBJ/facename/$runname/contrasts/enc_gr_rec.txt
 
 cd $OUTDIR/$SUBJ/facename/$runname
 outname=glm_output
-maskfile=${BASEDIR}/Analysis/Max/templates/DBIS115/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
+maskfile=${BASEDIR}/Analysis/Templates/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
 # arguments to stim_times are in seconds!
 # glt arg should always be 1
 # using polort 3 here per recommendation in afni_proc.py help documentation
@@ -89,9 +89,10 @@ gzip ${outname}_tstats.nii
 rm ${outname}.nii
 
 # extract ROI means to master file, using a lock dir system to make sure only one process is doing this at a time
-if [ ! -e $HOME/locks ]; then mkdir $HOME/locks; fi
+lockDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+if [ ! -e $lockDir ]; then mkdir $lockDir; fi
 while true; do
-	if mkdir $HOME/locks/facename; then
+	if mkdir $lockDir/facename; then
 		sleep 5 # seems like this is necessary to make sure any other processes have fully finished	
 		# first check for old values in master files and delete if found
 		lineNum=$(grep -n $SUBJ $MasterFile | cut -d: -f1)
@@ -103,7 +104,7 @@ while true; do
 		    str=$str,$(echo $vals | sed 's/ /,/g')
 		done; 
 		echo $str >> $MasterFile; 
-		rm -r $HOME/locks/facename
+		rm -r $lockDir/facename
 		break
 	else
 		sleep 2
