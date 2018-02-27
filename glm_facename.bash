@@ -6,9 +6,9 @@
 #$ -l h_vmem=12G 
 # -- END GLOBAL DIRECTIVE -- 
 
-BASEDIR=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/
+BASEDIR=$(findexp DBIS.01)
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
-BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/fMRI_Behavioral/Facename.csv
+BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/x_x.KEEP.OUT.x_x/Behavioral_Facename.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
 MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/BOLD_ROImeans_facename_$runname.csv
@@ -28,12 +28,23 @@ else
 		exit 32;
 	fi	
 fi
-# write response data summary stats to master file
-found=$(grep $SUBJ $BehavioralFile | wc -l)
-if [ $found -eq 0 ]; then
-	vals=`awk '{print $2}' $OUTDIR/$SUBJ/facename/ResponseData.txt`
-	echo .,$vals | sed 's/ /,/g' >> $BehavioralFile
-fi
+# write response data summary stats to master file, using a lock dir system to make sure only one process is doing this at a time
+lockDir=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+if [ ! -e $lockDir ]; then mkdir $lockDir; fi
+while true; do
+	if mkdir $lockDir/facename_behav; then
+		sleep 5 # seems like this is necessary to make sure any other processes have fully finished	
+		# first check for old values in master files and delete if found
+		lineNum=$(grep -n $SUBJ $BehavioralFile | cut -d: -f1)
+		if [ $lineNum -gt 0 ]; then	sed -i "${lineNum}d" $BehavioralFile; fi
+		vals=`awk '{print $2}' $OUTDIR/$SUBJ/facename/ResponseData.txt`
+		echo .,$vals | sed 's/ /,/g' >> $BehavioralFile
+		rm -r $lockDir/facename_behav
+		break
+	else
+		sleep 2
+	fi
+done
 
 mkdir -p $OUTDIR/$SUBJ/facename/$runname/contrasts
 
@@ -89,7 +100,7 @@ gzip ${outname}_tstats.nii
 rm ${outname}.nii
 
 # extract ROI means to master file, using a lock dir system to make sure only one process is doing this at a time
-lockDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+lockDir=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
 if [ ! -e $lockDir ]; then mkdir $lockDir; fi
 while true; do
 	if mkdir $lockDir/facename; then

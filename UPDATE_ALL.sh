@@ -1,6 +1,6 @@
 #!/bin/sh
 
-baseDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01
+baseDir=$(findexp DBIS.01)
 scriptDir=$baseDir/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
 logFile=$baseDir/Analysis/All_Imaging/LOG.csv
 masterDir=$baseDir/Data/ALL_DATA_TO_USE/Imaging/
@@ -13,6 +13,7 @@ cp $masterDir/x_x.KEEP.OUT.x_x/BOLD_R* $masterDir
 cp $masterDir/x_x.KEEP.OUT.x_x/DTI_E* $masterDir
 cp $masterDir/x_x.KEEP.OUT.x_x/Free* $masterDir
 cp $masterDir/x_x.KEEP.OUT.x_x/VBM* $masterDir
+cp $masterDir/x_x.KEEP.OUT.x_x/Behav* ${masterDir/Imaging/fMRI_Behavioral}
 
 cd $baseDir/Data/OTAGO
 
