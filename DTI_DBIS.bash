@@ -172,21 +172,19 @@ while true; do
 	echo $SUBJ,$vals1 | sed 's/ /,/g' >> $MasterFile
 	echo $SUBJ,$vals2 | sed 's/ /,/g' >> ${MasterFile/averageFA/nVoxels}
 	# print eddy QC stats to master file
-	lineNum=$(grep -n $SUBJ ${MasterFile/ENIGMA_ROIs_averageFA/QC} | cut -d: -f1);
-	if [ $lineNum -gt 0 ]; then sed -i "${lineNum}d" ${MasterFile/ENIGMA_ROIs_averageFA/QC}; fi; # delete old line from file
 	rms_list=$(awk '{print $2}' $OUTDIR/eddy_corrected_data.eddy_movement_rms); 
 	rms_max=$(echo "${rms_list[*]}" | sort -nr | head -n1); 
-	rrms_list=$(awk '{print $2}' $subj/DTI/eddy_corrected_data.eddy_restricted_movement_rms); 
+	rrms_list=$(awk '{print $2}' $OUTDIR/eddy_corrected_data.eddy_restricted_movement_rms); 
 	rrms_max=$(echo "${rrms_list[*]}" | sort -nr | head -n1); 
 	str=$SUBJ,$rms_max,$rrms_max
 	for thr in 0 4 9; do
-		flaggedSliceSums=$(awk '{ for(i=1; i<=NF;i++) j+=$i; print j; j=0 }' $id/DTI/eddy_corrected_data.eddy_outlier_map | tail -71)
+		flaggedSliceSums=$(awk '{ for(i=1; i<=NF;i++) j+=$i; print j; j=0 }' $OUTDIR/eddy_corrected_data.eddy_outlier_map | tail -71)
 		nVolumesAboveThr=0; for i in `echo $flaggedSliceSums`; do if [[ $i -gt $thr ]]; then nVolumesAboveThr=$((nVolumesAboveThr+1)); fi; done; 
 		str=$str,$nVolumesAboveThr 
 	done	
 	echo "$str" >> ${MasterFile/ENIGMA_ROIs_averageFA/QC}
-        rm -r $lockDir/DTI
-        break
+	rm -r $lockDir/DTI
+	break
   else
     sleep 2
   fi
