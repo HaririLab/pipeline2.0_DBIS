@@ -8,7 +8,7 @@
 
 BASEDIR=$(findexp DBIS.01)
 OUTDIR=$BASEDIR/Analysis/All_Imaging/
-BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/x_x.KEEP.OUT.x_x/Behavioral_Facename.csv
+BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/Behavioral_Facename.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
 MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/BOLD_ROImeans_facename_$runname.csv

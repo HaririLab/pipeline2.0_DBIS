@@ -2,8 +2,8 @@
 
 baseDir=$(findexp DBIS.01)
 scriptDir=$baseDir/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
-logFile=$baseDir/Analysis/All_Imaging/LOG.csv
 masterDir=$baseDir/Data/ALL_DATA_TO_USE/Imaging/
+logFile=$masterDir/PROCESSING_LOG.csv
 
 # copy master stats files from dir that is for script to write to only to dir that is for people to use; 
 ##could also use something like ls --ignore '*QC*' for the non-QC files?
@@ -11,7 +11,7 @@ echo "************************** Copying master stats files ********************
 cp $masterDir/x_x.KEEP.OUT.x_x/*QC* $masterDir/QC
 cp $masterDir/x_x.KEEP.OUT.x_x/BOLD_R* $masterDir
 cp $masterDir/x_x.KEEP.OUT.x_x/DTI_E* $masterDir
-cp $masterDir/x_x.KEEP.OUT.x_x/Free* $masterDir
+cp $masterDir/x_x.KEEP.OUT.x_x/Free* $masterDir/FreeSurfer
 cp $masterDir/x_x.KEEP.OUT.x_x/VBM* $masterDir
 cp $masterDir/x_x.KEEP.OUT.x_x/Behav* ${masterDir/Imaging/fMRI_Behavioral}
 
@@ -61,7 +61,9 @@ for SUBJ in `ls -d DMHDS[01]*`; do
 		## Add entry to log
 		found=$(grep $SUBJ $logFile | wc -l)
 		if [ $found -eq 0 ]; then
-			echo $SUBJ,0,0,0,0,0,0,0,0,0,0,0,0,0 >> $logFile;
+			dcm1=$(ls $baseDir/Data/OTAGO/$SUBJ/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/*dcm | head -1)
+			scandate=$(dicom_hdr $dcm1 | grep "ID Study Date" | cut -d"/" -f5)
+			echo $SUBJ,0,$(date),$scandate,0,0,0,0,0,0,0,0,0,0,0,0 >> $logFile;
 		fi
 		
 		if [ $submitted -gt 0 ]; then echo "************************** Finished submitting jobs for $SUBJ***************************************"; fi

@@ -30,28 +30,29 @@
 # -- END GLOBAL DIRECTIVE -- 
 
 sub=$1 #$1 or flag -s  #20161103_21449 #pipenotes= Change away from HardCoding later 
-subDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
+TOPDIR=$(findexp DBIS.01)
+subDir=$TOPDIR/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
 QADir=${subDir}/QA
 antDir=${subDir}/antCT
-freeDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/${sub}
+freeDir=$TOPDIR/Analysis/All_Imaging/FreeSurfer_AllSubs/${sub}
 tmpDir=${antDir}/tmp
 antPre="highRes_" #pipenotes= Change away from HardCoding laterF
-templateDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/Templates #pipenotes= update/Change away from HardCoding later
+templateDir=$TOPDIR/Analysis/Templates #pipenotes= update/Change away from HardCoding later
 templatePre=dunedin115template_MNI #pipenotes= update/Change away from HardCoding later
-anatDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/
-flairDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_3D_SAG_FLAIR_FS-_1.2_mm/
-graphicsDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Graphics/Brain_Images/ReadyToProcess/
+anatDir=$TOPDIR/Data/OTAGO/${sub}/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/
+flairDir=$TOPDIR/Data/OTAGO/${sub}/DMHDS/MR_3D_SAG_FLAIR_FS-_1.2_mm/
+graphicsDir=$TOPDIR/Graphics/Brain_Images/
 #T1=$2 #/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
 threads=$2
 if [ ${#threads} -eq 0 ]; then threads=1; fi # antsRegistrationSyN won't work properly if $threads is empty
 # baseDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-baseDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
+baseDir=$TOPDIR/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
 export PATH=$PATH:${baseDir}/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
 export OMP_NUM_THREADS=$threads
-export SUBJECTS_DIR=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/
-export FREESURFER_HOME=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/freesurfer
-export ANTSPATH=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/ants-2.2.0/bin/
+export SUBJECTS_DIR=$TOPDIR/Analysis/All_Imaging/FreeSurfer_AllSubs/
+export FREESURFER_HOME=${TOPDIR/DBIS/DNS}/Scripts/Tools/FreeSurfer/freesurfer
+export ANTSPATH=${TOPDIR/DBIS/DNS}/Scripts/Tools/ants-2.2.0/bin/
 export PATH=$PATH:${baseDir}/scripts/:${baseDir}/utils/:$ANTSPATH
 echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]----" 
 
@@ -79,12 +80,12 @@ if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];th
 	if [ ${#bestT1} -eq 0 ]; then
 		echo "!!!!!!!!!!!!!!!!!!!! No output from Dimon t1 import, attempting with dcm2niix !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 		firstDcm=$(ls ${anatDir}/1.3.12.2.1107.5.2.19* | head -1)
-		/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Scripts/Tools/mricrogl_lx/dcm2niix -o ${tmpDir} ${firstDcm}
+		${TOPDIR/DBIS/DNS}/Scripts/Tools/mricrogl_lx/dcm2niix -o ${tmpDir} ${firstDcm}
 		gzip ${tmpDir}/MR*nii
 		bestT1=$(ls ${tmpDir}/MR*nii.gz | tail -n1)
 	fi
 	3dcopy ${bestT1} ${tmpDir}/anat.nii.gz
-	mv flair.nii.gz dimon* GERT* ${tmpDir} 
+	mv dimon* GERT* ${tmpDir} # ARK removed flair.nii.gz from this list bc it doesn't exist at this point...
 	mv OutBrick* ${tmpDir}
 	sizeT1=$(@GetAfniRes ${T1})
 	echo $sizeT1
@@ -148,7 +149,7 @@ fi
 
 ### Now submit jobs to run EPI preprocessing (check if it's already been done in case we are re-running this script to add something like CT etc)
 # do this before freesurfer because freesurfer takes a long time and epis don't depend on any freesurfer output
-for task in faces stroop mid facename; do
+for task in faces stroop mid facename rest; do
 	if [ ! -e $subDir/$task/epiWarped_blur6mm.nii.gz ]; then
 		qsub $baseDir/epi_minProc_DBIS.sh $sub $task 1
 	fi
@@ -168,7 +169,7 @@ if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	#echo "mris_inflate -n 15" > ${tmpDir}/expert.opts
 	#Run
 	rm -r ${freeDir}
-	cd /mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FreeSurfer_AllSubs/
+	cd $TOPDIR/Analysis/All_Imaging/FreeSurfer_AllSubs/
 	#mksubjdirs ${sub}
 	#cp -R ${FREESURFER_HOME}/subjects/fsaverage ${subDir}/
 	echo $freeDir
@@ -195,8 +196,8 @@ if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
 		recon-all -subject $sub -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
 		rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
 		### Now add freesurfer values to Master files, using a lock dir system to make sure only one process is doing this at a time
-		MasterDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x
-		lockDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+		MasterDir=$TOPDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x
+		lockDir=$TOPDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
 		if [ ! -e $lockDir ]; then mkdir $lockDir; fi
 		while true; do
 			if mkdir $lockDir/freesurfer; then
@@ -221,9 +222,9 @@ if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
 								if [[ $f == *"/lh."* ]]; then
 									vals_R=`grep -v "#" $freeDir/stats/${fname/lh/rh} | awk -v colnum=$i '{print $colnum}'`; 
 									str_R=$(echo $vals_R | sed 's/ /,/g')
-									echo $str_L,$str_R	>> ${MasterDir}FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
+									echo $str_L,$str_R	>> ${MasterDir}/FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
 								else
-									echo $str_L	>> ${MasterDir}FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
+									echo $str_L	>> ${MasterDir}/FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
 								fi
 							fi; 
 							i=$((i+1)); 
@@ -259,18 +260,18 @@ fi
 ### Prep images to send to subjects
 found=$(grep $sub $graphicsDir/finished_processing.txt | wc -l);
 if [ $found -eq 0 ]; then
-	mkdir -p $graphicsDir/$sub/uncropped_T1/front;
-	mkdir -p $graphicsDir/$sub/uncropped_T1/top;
-	mkdir -p $graphicsDir/$sub/uncropped_T1/side;
-	mkdir -p $graphicsDir/$sub/MoreImages_3D;
-	mv ${antDir}/tmp/anat.nii.gz $graphicsDir/$sub/HighRes.nii.gz 
-	cp ${antDir}/${antPre}ExtractedBrain0N4.nii.gz $graphicsDir/$sub/c1HighRes.nii.gz 
+	mkdir -p $graphicsDir/ReadyToProcess/$sub/uncropped_T1/front;
+	mkdir -p $graphicsDir/ReadyToProcess/$sub/uncropped_T1/top;
+	mkdir -p $graphicsDir/ReadyToProcess/$sub/uncropped_T1/side;
+	mkdir -p $graphicsDir/ReadyToProcess/$sub/MoreImages_3D;
+	mv ${antDir}/tmp/anat.nii.gz $graphicsDir/ReadyToProcess/$sub/HighRes.nii.gz 
+	cp ${antDir}/${antPre}ExtractedBrain0N4.nii.gz $graphicsDir/ReadyToProcess/$sub/c1HighRes.nii.gz 
 fi
 
 ### copy files for vis check
-cp ${QADir}/anat.BrainExtractionCheckAxial.png /mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/anat.BrainExtractionCheckAxial/$sub.png
-cp ${QADir}/anat.BrainExtractionCheckSag.png /mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/anat.BrainExtractionCheckSag/$sub.png
-cp ${QADir}/anat.antCTCheck.png /mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/anat.antCTCheck/$sub.png
+cp ${QADir}/anat.BrainExtractionCheckAxial.png $TOPDIR/Graphics/Data_Check/NewPipeline/anat.BrainExtractionCheckAxial/$sub.png
+cp ${QADir}/anat.BrainExtractionCheckSag.png $TOPDIR/Graphics/Data_Check/NewPipeline/anat.BrainExtractionCheckSag/$sub.png
+cp ${QADir}/anat.antCTCheck.png $TOPDIR/Graphics/Data_Check/NewPipeline/anat.antCTCheck/$sub.png
 
 #cleanup
 #mv highRes_* antCT/ #pipeNotes: add more deletion and clean up to minimize space, think about deleting Freesurfer and some of SUMA output

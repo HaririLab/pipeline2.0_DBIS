@@ -113,14 +113,14 @@ fi
 dtifit -k eddy_corrected_data.nii.gz -m topup_corrected_brain_mask.nii.gz -o fitted_data -r AP_MDDW/AP_MDDW.bvec -b AP_MDDW/AP_MDDW.bval
 
 ## prep for trackVis (just using this to generate images to send to SMs for now), needs all b0 volumes to be at beginning
-finished=$(grep $SUBJ $EXPERIMENT/Graphics/Brain_Images/ReadyToProcess/finished_processing.txt | wc -l)
+finished=$(grep $SUBJ $EXPERIMENT/Graphics/Brain_Images/finished_processing.txt | wc -l)
 if [ $finished -eq 0 ]; then
-	if [ ! -e $EXPERIMENT/Graphics/Brain_Images/DTI_toProcess/$SUBJ/eddy_corrected_data_trackVis.nii.gz ]; then
+	if [ ! -e $EXPERIMENT/Graphics/Brain_Images/ReadyToProcess_DTI/$SUBJ/eddy_corrected_data_trackVis.nii.gz ]; then
 		fslroi eddy_corrected_data.nii.gz tmp_b3000volumes 1 64
 		fslmerge -t eddy_corrected_data_trackVis b0_AP_first b0_AP_last tmp_b3000volumes
 		rm tmp_b3000volumes*
-		mkdir $EXPERIMENT/Graphics/Brain_Images/DTI_toProcess/$SUBJ
-		mv eddy_corrected_data_trackVis.nii.gz $EXPERIMENT/Graphics/Brain_Images/DTI_toProcess/$SUBJ
+		mkdir $EXPERIMENT/Graphics/Brain_Images/ReadyToProcess_DTI/$SUBJ
+		mv eddy_corrected_data_trackVis.nii.gz $EXPERIMENT/Graphics/Brain_Images/ReadyToProcess_DTI/$SUBJ
 	fi
 fi
 

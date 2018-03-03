@@ -39,7 +39,7 @@ templateDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/Templates #pip
 templatePre=dunedin115template_MNI_ #pipenotes= update/Change away from HardCoding later
 antDir=${subDir}/antCT
 antPre="highRes_" #pipenotes= Change away from HardCoding later
-FDthresh=.25 #pipenotes= Change away from HardCoding later, also find citations for what you decide likely power 2014, minimun of .5 fd 20DVARS suggested
+FDthresh=.35 #pipenotes= Change away from HardCoding later, also find citations for what you decide likely power 2014, minimun of .5 fd 20DVARS suggested
 DVARSthresh=1.55 #pipenotes= Change away from HardCoding later, also find citations for what you decide
 
 echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]----"
@@ -78,7 +78,7 @@ antsApplyTransforms -d 3 -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t 
 3dpc -pcsave 5 -prefix ${tmpDir}/pcRest.wm.csf ${tmpDir}/rest.wm.csf.nii.gz
 mv ${tmpDir}/pcRest.wm.csf_vec.1D ${tmpOutDir}/
 ####Setup Censoring
-awk -v thresh=$FDthresh '{if($1 > thresh) print NR}' ${outDir}/FD.1D | awk '{print ($1 - 1) " " $2}' > ${tmpOutDir}/FDcensorTRs.1D #find TRs above threshold and subtract 1 from list to 0 index for afni's liking
+awk -v thresh=$FDthresh '{if($1 > thresh) print NR}' ${outDir}/FD_FSL.1D | awk '{print ($1 - 1) " " $2}' > ${tmpOutDir}/FDcensorTRs.1D #find TRs above threshold and subtract 1 from list to 0 index for afni's liking
 awk -v thresh=$DVARSthresh '{if($1 > thresh) print NR}' ${outDir}/DVARS.1D | awk '{print ($1) " " $2}' > ${tmpOutDir}/DVARScensorTRs.1D #find TRs above threshold and Don't subtract 1 from list because DVARS is based on change from first TR and has one less value, value 1 will therefore be for afni 1 index (TR number 2)
 
 cat ${tmpOutDir}/FDcensorTRs.1D ${tmpOutDir}/DVARScensorTRs.1D | sort -g | uniq > ${tmpOutDir}/censorTRs.1D #combine DVARS and FD TRs above threshold 
@@ -100,16 +100,28 @@ rm -r $tmpDir
 
 ##Now copy all files to the server. 
 #Because we run into issues when too many processes are trying to do this in parallel, use a lock dir system to make sure that only a small number of processes are doing this step simultaneously
-N_allowed=3
+N_allowed=1
 lockDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
 if [ ! -e $lockDir ]; then mkdir $lockDir; fi
 break=0
 while true; do
 	for i in `seq 1 $N_allowed`; do
 		if mkdir $lockDir/writingBigFiles$i; then
-			cp -r $tmpOutDir/* $outDir 
-			rm -r $lockDir/writingBigFiles$i
-			break=1
+			while true; do
+				if mkdir $outDir/fslFD35; then
+					rsync -v --stats --progress $tmpOutDir/* $outDir/fslFD35 # check out -W option, --timeout
+					echo rsync return code: $?
+					rm -r $lockDir/writingBigFiles$i
+					break=1
+					break
+				else
+					echo "mkdir $outDir/fslFD25 failed! Sleeping 5"
+					sleep 5
+				fi
+			done
+		fi
+		if [[ $break -eq 1 ]]; then
+			break
 		fi
 	done
 	if [[ $break -eq 1 ]]; then
@@ -121,7 +133,7 @@ done
 
 # -- BEGIN POST-USER -- 
 echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 
-mv $HOME/$JOB_NAME.$JOB_ID.out $outDir/$JOB_NAME.$JOB_ID.out	 
+mv $HOME/$JOB_NAME.$JOB_ID.out $outDir/fslFD35/$JOB_NAME.$JOB_ID.out	 
 # -- END POST-USER -- 
 
 
