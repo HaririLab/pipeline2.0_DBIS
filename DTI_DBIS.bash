@@ -20,14 +20,6 @@
 #$ -m ea
 #$ -l h_vmem=12G 
 # -- END GLOBAL DIRECTIVE -- 
-# -- BEGIN PRE-USER --
-# # # # # # # # # # # # # source /etc/biac_sge.sh  #idk if this accidentally got pasted here??
-# -- END PRE-USER --
-
-# -- BEGIN USER DIRECTIVE --
-# Send notifications to the following address
-#$ -M SUB_USEREMAIL_SUB
-# -- END USER DIRECTIVE --
 
 ## Initialize variables 
 SUBJ=$1          												# This is the full subject folder name under Data
