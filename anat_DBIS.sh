@@ -149,11 +149,14 @@ fi
 
 ### Now submit jobs to run EPI preprocessing (check if it's already been done in case we are re-running this script to add something like CT etc)
 # do this before freesurfer because freesurfer takes a long time and epis don't depend on any freesurfer output
-for task in faces stroop mid facename rest; do
+for task in faces stroop mid facename; do
 	if [ ! -e $subDir/$task/epiWarped_blur6mm.nii.gz ]; then
 		qsub $baseDir/epi_minProc_DBIS.sh $sub $task 1
 	fi
 done
+if [ ! -e $subDir/rest/epiWarped.nii.gz ]; then
+	qsub $baseDir/epi_minProc_DBIS.sh $sub rest 1
+fi
 
 ### Now run freesurfer
 if [[ ! -f ${freeDir}/surf/rh.pial ]];then

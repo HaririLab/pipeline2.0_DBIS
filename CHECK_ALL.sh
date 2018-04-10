@@ -36,13 +36,17 @@ FSct=$(grep $ID $ddir/FreeSurfer_aparc.a2009s_ThickAvg.csv | awk -F, '{print NF}
 
 if [[ $mode != list ]]; then	
 	echo -e "  anat.CTChec:   $a1 \t.BExCh: $a2 \t.vbmNii: $a3 \t.brImg: $a4 \t.FSext: $a5"
-	echo -e "  DTI.FAcheck:   $d1 \t.skeCh: $d2 \t.ROIout: $d3 \tQA.png: $q1" 
+	echo -e "  DTI.FAcheck:   $d1 \t.skeCh: $d2 \t.ROIout: $d3 \t\t\tQA.png: $q1" 
 else	
-	output_str="$output_str $a1 $a2 $a3 $a4 $d1 $d2 $d3 $q1"
+	output_str="$output_str $a1 $a2 $a3 $a4 $a5 $d1 $d2 $d3 $q1"
 fi
 
 for task in rest faces stroop mid facename; do
-	if [[ -e $adir/$ID/$task/epiWarped_blur6mm.nii.gz ]]; then t1=1; else t1=0; fi
+	if [[ $task == rest ]]; then
+		if [[ -e $adir/$ID/$task/epiWarped.nii.gz ]]; then t1=1; else t1=0; fi
+	else
+		if [[ -e $adir/$ID/$task/epiWarped_blur6mm.nii.gz ]]; then t1=1; else t1=0; fi
+	fi
 	if [[ -e $gdir/$task.epi2TemplateAlignmentCheck/$ID.png || -e $gdir/$task.epi2TemplateAlignmentCheck/alreadyChecked/$ID.png ]]; then t2=1; else t2=0; fi
 	censorLog=$(grep $ID $ddir/BOLD_QC_${task}_nFramesKept.csv | wc -l);
 	if [[ $censorLog -eq 1 ]]; then t5=1; else t5=0; fi
@@ -52,7 +56,7 @@ for task in rest faces stroop mid facename; do
 		if [[ $ROImeans -eq ${nROImeans[$task]} ]]; then t4=1; else t4=0; fi
 	else
 		if [[ $task == rest ]]; then	
-			if [[ -e $adir/$ID/$task/epiPrepped_blur6mm.nii.gz ]]; then t3=1; else t3=0; fi
+			if [[ -e $adir/$ID/$task/fslFD35/epiPrepped_blur6mm.nii.gz ]]; then t3=1; else t3=0; fi
 			t4=-; t5=-;
 		else
 			if [[ -e $adir/$ID/$task/glm_AFNI/glm_output_coefs.nii ]]; then t3=1; else t3=0; fi

@@ -5,19 +5,26 @@ scriptDir=$baseDir/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for
 masterDir=$baseDir/Data/ALL_DATA_TO_USE/Imaging/
 logFile=$masterDir/PROCESSING_LOG.csv
 
-# copy master stats files from dir that is for script to write to only to dir that is for people to use; 
-##could also use something like ls --ignore '*QC*' for the non-QC files?
-echo "************************** Copying master stats files ***************************************"
-cp $masterDir/x_x.KEEP.OUT.x_x/*QC* $masterDir/QC
-cp $masterDir/x_x.KEEP.OUT.x_x/BOLD_R* $masterDir
-cp $masterDir/x_x.KEEP.OUT.x_x/DTI_E* $masterDir
-cp $masterDir/x_x.KEEP.OUT.x_x/Free* $masterDir/FreeSurfer
-cp $masterDir/x_x.KEEP.OUT.x_x/VBM* $masterDir
-cp $masterDir/x_x.KEEP.OUT.x_x/Behav* ${masterDir/Imaging/fMRI_Behavioral}
-
 cd $baseDir/Data/OTAGO
 
-for SUBJ in `ls -d DMHDS[01]*`; do 
+if [[ $# -eq 1 ]]; then 
+	SUBJECTS=$1
+else
+	SUBJECTS=`ls -d DMHDS[01]*`;
+	
+	# copy master stats files from dir that is for script to write to only to dir that is for people to use; 
+	##could also use something like ls --ignore '*QC*' for the non-QC files?
+	echo "************************** Copying master stats files ***************************************"
+	cp $masterDir/x_x.KEEP.OUT.x_x/*QC* $masterDir/QC
+	cp $masterDir/x_x.KEEP.OUT.x_x/BOLD_R* $masterDir
+	cp $masterDir/x_x.KEEP.OUT.x_x/DTI_E* $masterDir
+	cp $masterDir/x_x.KEEP.OUT.x_x/Free* $masterDir/FreeSurfer
+	cp $masterDir/x_x.KEEP.OUT.x_x/VBM* $masterDir
+	cp $masterDir/x_x.KEEP.OUT.x_x/Behav* ${masterDir/Imaging/fMRI_Behavioral}
+	
+fi
+
+for SUBJ in $SUBJECTS; do 
 
 	finished=$(grep $SUBJ $logFile | cut -d, -f2)
 	if [[ $finished -ne 1 ]]; then
@@ -63,7 +70,7 @@ for SUBJ in `ls -d DMHDS[01]*`; do
 		if [ $found -eq 0 ]; then
 			dcm1=$(ls $baseDir/Data/OTAGO/$SUBJ/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/*dcm | head -1)
 			scandate=$(dicom_hdr $dcm1 | grep "ID Study Date" | cut -d"/" -f5)
-			echo $SUBJ,0,$(date),$scandate,0,0,0,0,0,0,0,0,0,0,0,0 >> $logFile;
+			echo $SUBJ,0,$(date),$scandate$(printf "%0.s,0" {1..49}) >> $logFile; # printf is for multiple ",0"s
 		fi
 		
 		if [ $submitted -gt 0 ]; then echo "************************** Finished submitting jobs for $SUBJ***************************************"; fi
