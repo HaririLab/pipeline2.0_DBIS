@@ -297,37 +297,17 @@ cp ${QADir}/$task.epi2TemplateAlignmentCheck.png /mnt/BIAC/munin4.dhe.duke.edu/H
 ##Clean up
 rm -r $tmpDir
 
-##Now copy all files to the server. 
-#Because we run into issues when too many processes are trying to do this in parallel, use a lock dir system to make sure that only a small number of processes are doing this step simultaneously
-N_allowed=1
-lockDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
-if [ ! -e $lockDir ]; then mkdir $lockDir; fi
-break=0
-while true; do
-	for i in `seq 1 $N_allowed`; do
-		if mkdir $lockDir/writingBigFiles$i; then
-			while true; do
-				if mkdir -p $outDir; then
-					rsync -v --stats --progress $tmpOutDir/* $outDir # check out -W option, --timeout
-					echo rsync return code: $?
-					rm -r $lockDir/writingBigFiles$i
-					break=1
-					break
-				else
-					echo "mkdir $outDir failed! Sleeping 5"
-					sleep 5
-				fi
-			done
-		fi
-		if [[ $break -eq 1 ]]; then
-			break
-		fi
-	done
-	if [[ $break -eq 1 ]]; then
-		break
-	else
-		sleep 2
-	fi
+##Now copy all files to the server using rsync for robustness
+mkdir -p $outDir
+rsync -r -v --stats --progress $tmpOutDir/* $outDir # check out -W option, --timeout
+returncode=$?
+##Doesn't always work the first time so check and try again if not
+ct=1
+while [[ $returncode -ne 0 ]] && [[ $ct -lt 5 ]]; do
+	echo rsync return code: $?
+	rsync -r -v --stats --progress $tmpOutDir/* $outDir # check out -W option, --timeout
+	returncode=$?
+	ct=$((ct+1))
 done
 
 ##run first level model
