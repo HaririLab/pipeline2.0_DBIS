@@ -79,6 +79,7 @@ if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];th
 	# check if Dimon import worked, if not try dcm2niix
 	if [ ${#bestT1} -eq 0 ]; then
 		echo "!!!!!!!!!!!!!!!!!!!! No output from Dimon t1 import, attempting with dcm2niix !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		rm MR*
 		firstDcm=$(ls ${anatDir}/1.3.12.2.1107.5.2.19* | head -1)
 		${TOPDIR/DBIS/DNS}/Scripts/Tools/mricrogl_lx/dcm2niix -o ${tmpDir} ${firstDcm}
 		gzip ${tmpDir}/MR*nii
@@ -131,7 +132,7 @@ if [[ ! -f ${antDir}/${antPre}JacModVBM_blur8mm.nii.gz ]] && [[ ! -f ${antDir}/$
 	gunzip ${antDir}/${antPre}JacModVBM_blur8mm.nii.gz # unzip for use in SPM
 fi
 ###Make Brain Extraction QA montages
-if [[ ! -f ${QADir}/anat.BrainExtractionCheckAxial.png ]];then
+if [[ ! -f ${QADir}/anat.BrainExtractionCheckAxial.png ]] || [[ ! -f ${QADir}/anat.BrainExtractionCheckSag.png ]] || [[ ! -f ${QADir}/anat.antCTCheck.png ]];then
 	echo ""
 	echo "#########################################################################################################"
 	echo "####################################Make QA montages######################################"
@@ -188,8 +189,21 @@ else
 	echo ""
 fi
 if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
-	Dimon -gert_to3d_prefix flair.nii.gz -infile_prefix ${flairDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin
-	mv flair.nii.gz dimon* GERT* ${tmpDir}
+	
+	Dimon -gert_to3d_prefix ${tmpDir}/flair.nii.gz -infile_prefix ${flairDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin
+	bestFlair=$(ls ${tmpDir}/flair*gz | tail -n1)
+	# check if Dimon import worked, if not try dcm2niix
+	if [ ${#bestFlair} -eq 0 ]; then
+		echo "!!!!!!!!!!!!!!!!!!!! No output from Dimon t1 import, attempting with dcm2niix !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		rm MR*
+		firstDcm=$(ls ${flairDir}/1.3.12.2.1107.5.2.19* | head -1)
+		${TOPDIR/DBIS/DNS}/Scripts/Tools/mricrogl_lx/dcm2niix -o ${tmpDir} ${firstDcm}
+		gzip ${tmpDir}/MR*nii
+		bestFlair=$(ls ${tmpDir}/MR*nii.gz | tail -n1)
+	fi
+	mv ${bestFlair} ${tmpDir}/flair.nii.gz
+	mv dimon* GERT* ${tmpDir}
+	
 	if [[ -f $FLAIR ]];then
 		echo ""
 		echo "#########################################################################################################"
