@@ -64,6 +64,7 @@ mkdir -p $tmpDir
 
 T1=${tmpDir}/anat.nii.gz
 FLAIR=${tmpDir}/flair.nii.gz
+updated_freesurfer=0; # flag so we know whether we need to re-write extracted values to files
 
 #if [[ ! -f $T1 ]];then
 #	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -182,7 +183,8 @@ if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	#cp ${freeDir}/mri/T1.mgz ${freeDir}/mri/brainmask.auto.mgz
 	#cp ${freeDir}/mri/brainmask.auto.mgz ${freeDir}/mri/brainmask.mgz
 	#recon-all -autorecon2 -autorecon3 -s $sub -openmp $threads
-	recon-all -s $sub -localGI -openmp $threads			
+	recon-all -s $sub -localGI -openmp $threads		
+	updated_freesurfer=1
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!Skipping FreeSurfer, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -190,8 +192,8 @@ else
 fi
 if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
 	
-	Dimon -gert_to3d_prefix ${tmpDir}/flair.nii.gz -infile_prefix ${flairDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin
-	bestFlair=$(ls ${tmpDir}/flair*gz | tail -n1)
+	Dimon -gert_to3d_prefix flair.nii.gz -infile_prefix ${flairDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin # DImon does not allow "/" in to3d_prefix
+	bestFlair=$(ls flair*gz | tail -n1)
 	# check if Dimon import worked, if not try dcm2niix
 	if [ ${#bestFlair} -eq 0 ]; then
 		echo "!!!!!!!!!!!!!!!!!!!! No output from Dimon t1 import, attempting with dcm2niix !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -203,6 +205,7 @@ if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
 	fi
 	mv ${bestFlair} ${tmpDir}/flair.nii.gz
 	mv dimon* GERT* ${tmpDir}
+	rm flair* # not sure what the rest of the Dimon output will look like if there's more than one flair, but this should cover it hopefully (if Dimon even works in that case...)
 	
 	if [[ -f $FLAIR ]];then
 		echo ""
@@ -211,51 +214,57 @@ if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
 		echo "#########################################################################################################"
 		echo ""
 		recon-all -subject $sub -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
-		rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
-		### Now add freesurfer values to Master files, using a lock dir system to make sure only one process is doing this at a time
-		MasterDir=$TOPDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x
-		lockDir=$TOPDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
-		if [ ! -e $lockDir ]; then mkdir $lockDir; fi
-		while true; do
-			if mkdir $lockDir/freesurfer; then
-				sleep 5 # seems like this is necessary to make sure any other processes have fully finished		
-				for file in `ls $MasterDir/FreeSurfer_[aBw]*csv`; do
-					# check for old values in master files and delete if found
-					lineNum=$(grep -n $sub $file | cut -d: -f1);
-					if [ $lineNum -gt 0 ]; then
-						sed -i "${lineNum}d" $file
-					fi
-				done
-				for f in `ls $freeDir/stats/lh*stats $freeDir/stats/[aw]*stats`; do
-					if [ $f != $freeDir/stats/lh.curv.stats ]; then # this file is different so skip it
-						measures=`grep "ColHeaders" $f | cut -d" " -f3-`; # skip first "#" and "ColHeaders" so col numbers line up with data
-						fname=${f/$freeDir\/stats\//}
-						fname_short=${fname/lh./}
-						i=1; 
-						for measure in $measures; do 
-							if [ $measure != StructName ] && [ $measure != Index ] && [ $measure != SegId ]; then 
-								vals_L=`grep -v "#" $freeDir/stats/${fname} | awk -v colnum=$i '{print $colnum}'`; 
-								str_L=$(echo $sub,$vals_L | sed 's/ /,/g')
-								if [[ $f == *"/lh."* ]]; then
-									vals_R=`grep -v "#" $freeDir/stats/${fname/lh/rh} | awk -v colnum=$i '{print $colnum}'`; 
-									str_R=$(echo $vals_R | sed 's/ /,/g')
-									echo $str_L,$str_R	>> ${MasterDir}/FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
-								else
-									echo $str_L	>> ${MasterDir}/FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
-								fi
-							fi; 
-							i=$((i+1)); 
-						done
-					fi
-				done	
-				rm -r $lockDir/freesurfer
-				break
-			else
-				sleep 2
-			fi
-		done	
+		rm -r ${freeDir}/SUMA ##Removed because if SUMA has already been run, it will be based on wrong pial once we run recon-all with flair
+		updated_freesurfer=1
 	fi
+	
 fi
+
+### Now add freesurfer values to Master files, using a lock dir system to make sure only one process is doing this at a time
+if [[ $updated_freesurfer -eq 1 ]]; then
+	MasterDir=$TOPDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x
+	lockDir=$TOPDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
+	if [ ! -e $lockDir ]; then mkdir $lockDir; fi
+	while true; do
+		if mkdir $lockDir/freesurfer; then
+			sleep 5 # seems like this is necessary to make sure any other processes have fully finished		
+			for file in `ls $MasterDir/FreeSurfer_[aBw]*csv`; do
+				# check for old values in master files and delete if found
+				lineNum=$(grep -n $sub $file | cut -d: -f1);
+				if [ $lineNum -gt 0 ]; then
+					sed -i "${lineNum}d" $file
+				fi
+			done
+			for f in `ls $freeDir/stats/lh*stats $freeDir/stats/[aw]*stats`; do
+				if [ $f != $freeDir/stats/lh.curv.stats ]; then # this file is different so skip it
+					measures=`grep "ColHeaders" $f | cut -d" " -f3-`; # skip first "#" and "ColHeaders" so col numbers line up with data
+					fname=${f/$freeDir\/stats\//}
+					fname_short=${fname/lh./}
+					i=1; 
+					for measure in $measures; do 
+						if [ $measure != StructName ] && [ $measure != Index ] && [ $measure != SegId ]; then 
+							vals_L=`grep -v "#" $freeDir/stats/${fname} | awk -v colnum=$i '{print $colnum}'`; 
+							str_L=$(echo $sub,$vals_L | sed 's/ /,/g')
+							if [[ $f == *"/lh."* ]]; then
+								vals_R=`grep -v "#" $freeDir/stats/${fname/lh/rh} | awk -v colnum=$i '{print $colnum}'`; 
+								str_R=$(echo $vals_R | sed 's/ /,/g')
+								echo $str_L,$str_R	>> ${MasterDir}/FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
+							else
+								echo $str_L	>> ${MasterDir}/FreeSurfer_${fname_short/.stats/}_${measure}.csv; 
+							fi
+						fi; 
+						i=$((i+1)); 
+					done
+				fi
+			done	
+			rm -r $lockDir/freesurfer
+			break
+		else
+			sleep 5
+		fi
+	done
+fi	
+		
 #Run SUMA
 if [[ ! -f ${freeDir}/SUMA/std.60.rh.thickness.niml.dset ]];then
 	echo ""
@@ -264,6 +273,7 @@ if [[ ! -f ${freeDir}/SUMA/std.60.rh.thickness.niml.dset ]];then
 	echo "#########################################################################################################"
 	echo ""
 	cd ${freeDir}
+	rm -r ${freeDir}/SUMA # SUMA will fail if the file ${sub}_SurfVol.nii.gz already exists, so best to delete any output from old run and start fresh
 	@SUMA_Make_Spec_FS_lgi -NIFTI -ld 60 -sid $sub
 	#ConvertDset -o_gii -input ${freeDir}/SUMA/std.60.lh.area.niml.dset -prefix ${freeDir}/SUMA/std.60.lh.area
 	#ConvertDset -o_gii -input ${freeDir}/SUMA/std.60.rh.area.niml.dset -prefix ${freeDir}/SUMA/std.60.rh.area
