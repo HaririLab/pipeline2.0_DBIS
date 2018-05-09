@@ -256,7 +256,11 @@ if [[ $updated_freesurfer -eq 1 ]]; then
 						i=$((i+1)); 
 					done
 				fi
-			done	
+			done
+			# now get the aseg whole-brain summary measures, which are formatted differently than the others
+			vals=$(grep Measure $freeDir/stats/aseg.stats | awk -F", " '{print $4}')
+			echo $sub $vals	| sed -e 's/ /,/g' >> ${MasterDir}/FreeSurfer_aseg_SummaryMeasures.csv; 
+			# clean up
 			rm -r $lockDir/freesurfer
 			break
 		else
