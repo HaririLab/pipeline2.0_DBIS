@@ -39,7 +39,9 @@ while true; do
 		lineNum=$(grep -n $SUBJ $BehavioralFile | cut -d: -f1)
 		if [ $lineNum -gt 0 ]; then	sed -i "${lineNum}d" $BehavioralFile; fi
 		vals=`awk '{print $2}' $OUTDIR/$SUBJ/faces/ResponseData.txt`
-		echo .,$vals | sed 's/ /,/g' >> $BehavioralFile
+		acc=$(grep FacesAccuracy $OUTDIR/$SUBJ/faces/ResponseData.txt | awk '{print $2}')
+		if [[ $(echo "$acc < .5" | bc ) -eq 1 ]]; then ok=0; else ok=1; fi
+		echo .,$vals,$ok | sed 's/ /,/g' >> $BehavioralFile
 		rm -r $lockDir/faces_behav
 		break
 	else
