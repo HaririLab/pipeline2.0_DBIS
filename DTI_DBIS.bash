@@ -47,21 +47,8 @@ mkdir -p $OUTDIR/AP_MDDW
 ## import dicoms
 firstPAfile=`ls $DATADIR/MR_POST_DWI_P-A_DIST_Change_180/*dcm | head -n 1`
 firstAPfile=`ls $DATADIR/MR_MDDW_64_directions_ep2d_diff_p2s2/*dcm | head -n 1`
-dcm2niix -z y -o $OUTDIR/AP_MDDW $firstAPfile # had to add -z y for dcm2niix to output nii.gz rahter than .nii
-dcm2niix -z y -o $OUTDIR/PA $firstPAfile
-
-## rename files to make easier to work with
-## AP
-cd $OUTDIR/AP_MDDW
-filename=`ls MR*bval`
-filename=${filename/.bval/}
-mv $filename.bval AP_MDDW.bval
-mv $filename.bvec AP_MDDW.bvec
-mv $filename.nii.gz AP_MDDW.nii.gz
-## PA: 3 b0s collected
-cd $OUTDIR/PA
-filename=`ls MR*gz`
-mv $filename b0_PA.nii.gz
+dcm2niix -z y -o $OUTDIR/AP_MDDW -f AP_MDDW $firstAPfile # had to add -z y for dcm2niix to output nii.gz rahter than .nii
+dcm2niix -z y -o $OUTDIR/PA -f b0_PA $firstPAfile
 
 cd $OUTDIR
 
