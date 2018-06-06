@@ -12,7 +12,7 @@ TASKDIR=stroop
 BehavioralFile=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/Behavioral_Stroop.csv
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
 runname=glm_AFNI
-MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/BOLD_ROImeans_stroop_$runname.csv
+MasterFile=$BASEDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/fMRI_ROImeans_stroop_$runname.csv
 
 SUBJ=$1;
 maskfile=${BASEDIR}/Analysis/Templates/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
@@ -44,7 +44,7 @@ while true; do
 		if [ $lineNum -gt 0 ]; then	sed -i "${lineNum}d" $BehavioralFile; fi
 		vals=`awk '{print $2}' $OUTDIR/$SUBJ/stroop/ResponseData.txt`
 		acc=$(grep AvgInconAcc $OUTDIR/$SUBJ/stroop/ResponseData.txt | awk '{print $2}')
-		if [[ $(echo "$acc < .1" | bc ) -eq 1 ]]; then ok=0; else ok=1; fi		
+		if [[ $(echo "$acc < .1" | bc ) -eq 1 ]]; then ok=-1; else ok=1; fi		
 		echo .,$vals,$ok | sed 's/ /,/g' >> $BehavioralFile
 		rm -r $lockDir/stroop_behav
 		break

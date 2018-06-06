@@ -27,18 +27,24 @@ declare -A nROImeans; nROImeans[facename]=7; nROImeans[mid]=13; nROImeans[faces]
 if [[ -e $gdir/anat.antCTCheck/$ID.png || -e $gdir/anat.antCTCheck/alreadyChecked/$ID.png ]]; then a1=1; else a1=0; fi
 if [[ -e $gdir/anat.BrainExtractionCheckAxial/$ID.png || -e $gdir/anat.BrainExtractionCheckAxial/alreadyChecked/$ID.png ]]; then a2=1; else a2=0; fi
 if [[ -e $vdir/$ID/anat/VBM_DARTEL_8mm/smwc1HighRes.nii ]]; then a3=1; else a3=0; fi
-if [[ -e $bdir/$ID/c1HighRes.nii.gz && -e $bdir/$ID/HighRes.nii.gz ]]; then a4=1; else a4=0; fi
+ct=$(grep $ID ${bdir/ReadyToProcess/finished_processing.txt} | wc -l); if [[ -e $bdir/$ID/c1HighRes.nii.gz && -e $bdir/$ID/HighRes.nii.gz  && -e ${bdir}_DTI/$ID/eddy_corrected_data_trackVis.nii.gz ]] || [[ $ct -gt 0 ]]; then a4=1; else a4=0; fi
 if [[ -e $gdir/DTI.FA_normalized_ENIGMA/$ID.png || -e $gdir/DTI.FA_normalized_ENIGMA/alreadyChecked/$ID.png ]]; then d1=1; else d1=0; fi
 if [[ -e $gdir/DTI.Final_Skeleton/$ID.png || -e $gdir/DTI.Final_Skeleton/alreadyChecked/$ID.png ]]; then d2=1; else d2=0; fi
 if [[ -e $adir/$ID/DTI/stats/ROIout.csv ]]; then d3=1; else d3=0; fi
 if [[ -e $qdir/$ID.jpg || -e $qdir/alreadyChecked/$ID.jpg ]]; then q1=1; else q1=0; fi
 FSct=$(grep $ID $ddir/FreeSurfer_aparc.a2009s_ThickAvg.csv | awk -F, '{print NF}'); if [[ $FSct -eq 149 ]]; then a5=1; else a5=0; fi
+if [ ! -f $adir/$ID/antCT/highRes_CorticalThicknessNormalizedToTemplate_blur6mm.nii ]; then a6=0; else a6=1; fi
+if [ ! -f $adir/$ID/antCT/highRes_JacModVBM_blur8mm.nii ]; then a7=0; else a7=1; fi
+if [ ! -f $adir/FreeSurfer_AllSubs/$ID/surf/rh.pial ]; then a8=0; else a8=1; fi
+if [ ! -f $adir/FreeSurfer_AllSubs/$ID/surf/lh.woFLAIR.pial ]; then a9=0; else a9=1; fi
+if [ ! -f $adir/FreeSurfer_AllSubs/$ID/scripts/recon-all.done ]; then a10=0; else a10=1; fi
+if [ ! -f $adir/FreeSurfer_AllSubs/$ID/SUMA/std.60.rh.thickness.niml.dset ]; then a11=0; else a11=1; fi
 
 if [[ $mode != list ]]; then	
-	echo -e "  anat.CTChec:   $a1 \t.BExCh: $a2 \t.vbmNii: $a3 \t.brImg: $a4 \t.FSext: $a5"
+	echo -e "  anat.CTChec:   $a1 \t.BExCh: $a2 \t.vbmNii: $a3 \t.brImg: $a4 \t.FSext: $a5 \t.CT: $a6 \t.VBM: $a7 \t.pial1: $a8 \t.pial2: $a9 \t.reconDone: $a10\t.SUMA: $a11"
 	echo -e "  DTI.FAcheck:   $d1 \t.skeCh: $d2 \t.ROIout: $d3 \t\t\tQA.png: $q1" 
 else	
-	output_str="$output_str $a1 $a2 $a3 $a4 $a5 $d1 $d2 $d3 $q1"
+	output_str="$output_str $a1 $a2 $a3 $a4 $a5 $a6 $a7 $a8 $a9 $a10 $a11 $d1 $d2 $d3 $q1"
 fi
 
 for task in rest faces stroop mid facename; do
@@ -48,19 +54,24 @@ for task in rest faces stroop mid facename; do
 		if [[ -e $adir/$ID/$task/epiWarped_blur6mm.nii.gz ]]; then t1=1; else t1=0; fi
 	fi
 	if [[ -e $gdir/$task.epi2TemplateAlignmentCheck/$ID.png || -e $gdir/$task.epi2TemplateAlignmentCheck/alreadyChecked/$ID.png ]]; then t2=1; else t2=0; fi
-	censorLog=$(grep $ID $ddir/BOLD_QC_${task}_nFramesKept.csv | wc -l);
+	censorLog=$(grep $ID $ddir/fMRI_QC_${task}_nFramesKept.csv | wc -l);
 	if [[ $censorLog -eq 1 ]]; then t5=1; else t5=0; fi
 	if [[ $task == faces ]]; then
 		if [[ -e $adir/$ID/$task/glm_AFNI_splitRuns/faces_gr_shapes_avg.nii.gz ]]; then t3=1; else t3=0; fi
-		ROImeans=$(grep $ID $ddir/BOLD_ROImeans_faces_glm_AFNI_splitRuns.csv | awk -F, '{print NF}');
+		ROImeans=$(grep $ID $ddir/fMRI_ROImeans_faces_glm_AFNI_splitRuns.csv | awk -F, '{print NF}');
 		if [[ $ROImeans -eq ${nROImeans[$task]} ]]; then t4=1; else t4=0; fi
 	else
 		if [[ $task == rest ]]; then	
-			if [[ -e $adir/$ID/$task/fslFD35/epiPrepped_blur6mm.nii.gz ]]; then t3=1; else t3=0; fi
+			if [[ -e $adir/$ID/$task/fslFD35/epiPrepped_blur6mm.nii.gz ]]; then 
+				t3=1; 
+			else 
+				df=$(grep "too many for 248 retained time points" $adir/$ID/$task/fslFD35/rest_DBIS.sh.*.out 2>/dev/null | wc -l); # check if the issue is not enough degrees of freedom
+				if [[ $df -eq 1 ]]; then t3=3; else t3=0; fi
+			fi
 			t4=-; t5=-;
 		else
 			if [[ -e $adir/$ID/$task/glm_AFNI/glm_output_coefs.nii ]]; then t3=1; else t3=0; fi
-			ROImeans=$(grep $ID $ddir/BOLD_ROImeans_${task}_glm_AFNI.csv | awk -F, '{print NF}');
+			ROImeans=$(grep $ID $ddir/fMRI_ROImeans_${task}_glm_AFNI.csv | awk -F, '{print NF}');
 			if [[ $task != stroop ]]; then
 				if [[ $ROImeans -eq ${nROImeans[$task]} ]]; then t4=1; else t4=0; fi
 			else

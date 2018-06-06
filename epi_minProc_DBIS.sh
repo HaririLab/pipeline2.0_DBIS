@@ -314,7 +314,9 @@ done
 if [ $task != "rest" ]; then
 	qsub $scriptDir/glm_$task.bash $sub
 else
-	qsub $scriptDir/rest_DBIS.sh $sub
+	if [ ! -e $outDir/fslFD35/epiPrepped_blur6mm.nii.gz ]; then 
+		qsub $scriptDir/rest_DBIS.sh $sub
+	fi
 fi
 
 # -- BEGIN POST-USER -- 
