@@ -24,43 +24,51 @@
 ###############################################################################
 
 # --- BEGIN GLOBAL DIRECTIVE -- 
-#$ -o $HOME/$JOB_NAME.$JOB_ID.out
-#$ -e $HOME/$JOB_NAME.$JOB_ID.out
-#$ -l h_vmem=24G 
-# -- END GLOBAL DIRECTIVE -- 
+#SBATCH --output=/dscrhome/%u/anat_DBIS.%j.out 
+#SBATCH --error=/dscrhome/%u/anat_DBIS.%j.out 
+# SBATCH --mail-user=%u@duke.edu
+# SBATCH --mail-type=END
+#SBATCH --mem=24000 # max is 64G on common partition, 64-240G on common-large
+# -- END GLOBAL DIRECTIVE -
 
-sub=$1 #$1 or flag -s  #20161103_21449 #pipenotes= Change away from HardCoding later 
-TOPDIR=$(findexp DBIS.01)
-subDir=$TOPDIR/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
-QADir=${subDir}/QA
-antDir=${subDir}/antCT
-freeDir=$TOPDIR/Analysis/All_Imaging/FreeSurfer_AllSubs/${sub}
+source ~/.bash_profile
+
+sub=$1 # use just 4 digit number! E.g 0234 for DMHDS0234
+threads=$2
+TOPDIR=/cifs/hariri-long
+imagingDir=$TOPDIR/Studies/DBIS/Imaging
+QADir=$imagingDir/derivatives/QA/sub-${sub}
+antDir=$imagingDir/derivatives/ANTs/sub-${sub}
+freeDir=$imagingDir/derivatives/freesurfer_v6.0/sub-${sub}
 tmpDir=${antDir}/tmp
 antPre="highRes_" #pipenotes= Change away from HardCoding laterF
-templateDir=$TOPDIR/Analysis/Templates #pipenotes= update/Change away from HardCoding later
+templateDir=$TOPDIR/Templates/DBIS/WholeBrain #pipenotes= update/Change away from HardCoding later
 templatePre=dunedin115template_MNI #pipenotes= update/Change away from HardCoding later
-anatDir=$TOPDIR/Data/OTAGO/${sub}/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/
-flairDir=$TOPDIR/Data/OTAGO/${sub}/DMHDS/MR_3D_SAG_FLAIR_FS-_1.2_mm/
-graphicsDir=$TOPDIR/Graphics/Brain_Images/
+anatDir=$imagingDir/sourcedata/sub-${sub}/anat
+#flairDir=$TOPDIR/Data/OTAGO/${sub}/DMHDS/MR_3D_SAG_FLAIR_FS-_1.2_mm/
+graphicsDir=$TOPDIR/Studies/DBIS/Graphics
+MasterDir=$TOPDIR/Database/DBIS/Imaging/x_x.KEEP.OUT.x_x
+lockDir=$TOPDIR/Database/DBIS/Imaging/x_x.KEEP.OUT.x_x/locks
 #T1=$2 #/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
-threads=$2
 if [ ${#threads} -eq 0 ]; then threads=1; fi # antsRegistrationSyN won't work properly if $threads is empty
 # baseDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-baseDir=$TOPDIR/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
-export PATH=$PATH:${baseDir}/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
+#DCCnotes: do all this in bash_profile instead?
+scriptDir=$TOPDIR/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
 export OMP_NUM_THREADS=$threads
-export SUBJECTS_DIR=$TOPDIR/Analysis/All_Imaging/FreeSurfer_AllSubs/
-export FREESURFER_HOME=${TOPDIR/DBIS/DNS}/Scripts/Tools/FreeSurfer/freesurfer
-export ANTSPATH=${TOPDIR/DBIS/DNS}/Scripts/Tools/ants-2.2.0/bin/
-export PATH=$PATH:${baseDir}/scripts/:${baseDir}/utils/:$ANTSPATH
-echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]----" 
+export SUBJECTS_DIR=$imagingDir/derivatives/freesurfer_v6.0
+export FREESURFER_HOME=$TOPDIR/Scripts/Tools/FreeSurfer/freesurfer
+export ANTSPATH=$TOPDIR/Scripts/Tools/ants-2.2.0/bin/
+export PATH=$PATH:${scriptDir}/:${scriptDir/DBIS/common}/:${scriptDir}/utils/  #DCCnotes: do this all in bash_profile?
+
+echo "----JOB [$SLURM_JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]----" 
+echo "----CALL: $0 $@----"
 
 ##Set up directory
 mkdir -p $QADir
-cd $subDir
 mkdir -p $antDir
 mkdir -p $tmpDir
+cd $antDir
 
 T1=${tmpDir}/anat.nii.gz
 FLAIR=${tmpDir}/flair.nii.gz
@@ -75,20 +83,8 @@ updated_freesurfer=0; # flag so we know whether we need to re-write extracted va
 #fi
 
 if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];then
-	Dimon -infile_prefix ${anatDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin
-	bestT1=$(ls OutBrick_run_0* | tail -n1)
-	# check if Dimon import worked, if not try dcm2niix
-	if [ ${#bestT1} -eq 0 ]; then
-		echo "!!!!!!!!!!!!!!!!!!!! No output from Dimon t1 import, attempting with dcm2niix !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-		rm MR*
-		firstDcm=$(ls ${anatDir}/1.3.12.2.1107.5.2.19* | head -1)
-		${TOPDIR/DBIS/DNS}/Scripts/Tools/mricrogl_lx/dcm2niix -o ${tmpDir} ${firstDcm}
-		gzip ${tmpDir}/MR*nii
-		bestT1=$(ls ${tmpDir}/MR*nii.gz | tail -n1)
-	fi
-	3dcopy ${bestT1} ${tmpDir}/anat.nii.gz
-	mv dimon* GERT* ${tmpDir} # ARK removed flair.nii.gz from this list bc it doesn't exist at this point...
-	mv OutBrick* ${tmpDir}
+	bestT1=$(ls $anatDir/*T1w.nii.gz | tail -n1)
+	3dcopy ${bestT1} $T1
 	sizeT1=$(@GetAfniRes ${T1})
 	echo $sizeT1
 	#if [[ $sizeT1 != "0.875000 0.875000 0.900000" ]];then
@@ -152,12 +148,12 @@ fi
 ### Now submit jobs to run EPI preprocessing (check if it's already been done in case we are re-running this script to add something like CT etc)
 # do this before freesurfer because freesurfer takes a long time and epis don't depend on any freesurfer output
 for task in faces stroop mid facename; do
-	if [ ! -e $subDir/$task/epiWarped_blur6mm.nii.gz ]; then
-		qsub $baseDir/epi_minProc_DBIS.sh $sub $task 1
+	if [ ! -e $imagingDir/derivatives/epiMinProc_$task/sub-$sub/epiWarped_blur6mm.nii.gz ]; then
+		sbatch $scriptDir/epi_minProc_DBIS.sh $sub $task 1
 	fi
 done
-if [ ! -e $subDir/rest/epiWarped.nii.gz ]; then
-	qsub $baseDir/epi_minProc_DBIS.sh $sub rest 1
+if [ ! -e $imagingDir/derivatives/epiMinProc_rest/sub-$sub/epiWarped.nii.gz ]; then
+	sbatch $scriptDir/epi_minProc_DBIS.sh $sub rest 1
 fi
 
 ### Now run freesurfer
@@ -174,16 +170,15 @@ if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	#echo "mris_inflate -n 15" > ${tmpDir}/expert.opts
 	#Run
 	rm -r ${freeDir}
-	cd $TOPDIR/Analysis/All_Imaging/FreeSurfer_AllSubs/
+	cd $imagingDir/derivatives/freesurfer_v6.0
 	#mksubjdirs ${sub}
 	#cp -R ${FREESURFER_HOME}/subjects/fsaverage ${subDir}/
-	echo $freeDir
 	#mri_convert ${antDir}/${antPre}ExtractedBrain0N4.nii.gz ${freeDir}/mri/001.mgz
-	${FREESURFER_HOME}/bin/recon-all_noLink -all -s $sub -openmp $threads -i ${antDir}/${antPre}rWarped.nii.gz ##Had to edit recon-all to remove soft links in white matter step, links not allowed on BIAC
+	${FREESURFER_HOME}/bin/recon-all_noLink -all -s sub-$sub -openmp $threads -i ${antDir}/${antPre}rWarped.nii.gz ##Had to edit recon-all to remove soft links in white matter step, links not allowed on BIAC
 	#cp ${freeDir}/mri/T1.mgz ${freeDir}/mri/brainmask.auto.mgz
 	#cp ${freeDir}/mri/brainmask.auto.mgz ${freeDir}/mri/brainmask.mgz
 	#recon-all -autorecon2 -autorecon3 -s $sub -openmp $threads
-	recon-all -s $sub -localGI -openmp $threads		
+	recon-all -s sub-$sub -localGI -openmp $threads		
 	updated_freesurfer=1
 else
 	echo ""
@@ -192,20 +187,8 @@ else
 fi
 if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
 	
-	Dimon -gert_to3d_prefix flair.nii.gz -infile_prefix ${flairDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin # DImon does not allow "/" in to3d_prefix
-	bestFlair=$(ls flair*gz | tail -n1)
-	# check if Dimon import worked, if not try dcm2niix
-	if [ ${#bestFlair} -eq 0 ]; then
-		echo "!!!!!!!!!!!!!!!!!!!! No output from Dimon t1 import, attempting with dcm2niix !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-		rm MR*
-		firstDcm=$(ls ${flairDir}/1.3.12.2.1107.5.2.19* | head -1)
-		${TOPDIR/DBIS/DNS}/Scripts/Tools/mricrogl_lx/dcm2niix -o ${tmpDir} ${firstDcm}
-		gzip ${tmpDir}/MR*nii
-		bestFlair=$(ls ${tmpDir}/MR*nii.gz | tail -n1)
-	fi
-	mv ${bestFlair} ${tmpDir}/flair.nii.gz
-	mv dimon* GERT* ${tmpDir}
-	rm flair* # not sure what the rest of the Dimon output will look like if there's more than one flair, but this should cover it hopefully (if Dimon even works in that case...)
+	bestFlair=$(ls $anatDir/*T2w.nii.gz | tail -n1)
+	3dcopy ${bestFlair} $FLAIR
 	
 	if [[ -f $FLAIR ]];then
 		echo ""
@@ -213,7 +196,7 @@ if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
 		echo "#####################################Cleanup of Surface With FLAIR#######################################"
 		echo "#########################################################################################################"
 		echo ""
-		recon-all -subject $sub -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
+		recon-all -subject sub-$sub -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
 		rm -r ${freeDir}/SUMA ##Removed because if SUMA has already been run, it will be based on wrong pial once we run recon-all with flair
 		updated_freesurfer=1
 	fi
@@ -222,17 +205,15 @@ fi
 
 ### Now add freesurfer values to Master files, using a lock dir system to make sure only one process is doing this at a time
 if [[ $updated_freesurfer -eq 1 ]]; then
-	MasterDir=$TOPDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x
-	lockDir=$TOPDIR/Data/ALL_DATA_TO_USE/Imaging/x_x.KEEP.OUT.x_x/locks
 	if [ ! -e $lockDir ]; then mkdir $lockDir; fi
 	while true; do
 		if mkdir $lockDir/freesurfer; then
 			sleep 5 # seems like this is necessary to make sure any other processes have fully finished		
 			for file in `ls $MasterDir/FreeSurfer_[aBw]*csv`; do
 				# check for old values in master files and delete if found
-				lineNum=$(grep -n $sub $file | cut -d: -f1);
+				lineNum=$(grep -n DMHDS$sub $file | cut -d: -f1);
 				if [ $lineNum -gt 0 ]; then
-					sed -i "${lineNum}d" $file
+					sed -ci "${lineNum}d" $file
 				fi
 			done
 			for f in `ls $freeDir/stats/lh*stats $freeDir/stats/[aw]*stats`; do
@@ -244,7 +225,7 @@ if [[ $updated_freesurfer -eq 1 ]]; then
 					for measure in $measures; do 
 						if [ $measure != StructName ] && [ $measure != Index ] && [ $measure != SegId ]; then 
 							vals_L=`grep -v "#" $freeDir/stats/${fname} | awk -v colnum=$i '{print $colnum}'`; 
-							str_L=$(echo $sub,$vals_L | sed 's/ /,/g')
+							str_L=$(echo DMHDS$sub,$vals_L | sed 's/ /,/g')
 							if [[ $f == *"/lh."* ]]; then
 								vals_R=`grep -v "#" $freeDir/stats/${fname/lh/rh} | awk -v colnum=$i '{print $colnum}'`; 
 								str_R=$(echo $vals_R | sed 's/ /,/g')
@@ -259,7 +240,7 @@ if [[ $updated_freesurfer -eq 1 ]]; then
 			done
 			# now get the aseg whole-brain summary measures, which are formatted differently than the others
 			vals=$(grep Measure $freeDir/stats/aseg.stats | awk -F", " '{print $4}')
-			echo $sub $vals	| sed -e 's/ /,/g' >> ${MasterDir}/FreeSurfer_aseg_SummaryMeasures.csv; 
+			echo DMHDS$sub $vals	| sed -e 's/ /,/g' >> ${MasterDir}/FreeSurfer_aseg_SummaryMeasures.csv; 
 			# clean up
 			rm -r $lockDir/freesurfer
 			break
@@ -278,7 +259,7 @@ if [[ ! -f ${freeDir}/SUMA/std.60.rh.thickness.niml.dset ]];then
 	echo ""
 	cd ${freeDir}
 	rm -r ${freeDir}/SUMA # SUMA will fail if the file ${sub}_SurfVol.nii.gz already exists, so best to delete any output from old run and start fresh
-	@SUMA_Make_Spec_FS_lgi -NIFTI -ld 60 -sid $sub
+	@SUMA_Make_Spec_FS_lgi -NIFTI -ld 60 -sid sub-$sub
 	#ConvertDset -o_gii -input ${freeDir}/SUMA/std.60.lh.area.niml.dset -prefix ${freeDir}/SUMA/std.60.lh.area
 	#ConvertDset -o_gii -input ${freeDir}/SUMA/std.60.rh.area.niml.dset -prefix ${freeDir}/SUMA/std.60.rh.area
 	#ConvertDset -o_gii -input ${freeDir}/SUMA/std.60.lh.thickness.niml.dset -prefix ${freeDir}/SUMA/std.60.lh.thickness
@@ -289,30 +270,30 @@ else
 	echo ""
 fi
 ### Prep images to send to subjects
-found=$(grep $sub $graphicsDir/finished_processing.txt | wc -l);
+found=$(grep DMHDS$sub $graphicsDir/Brain_Images/finished_processing.txt | wc -l);
 if [ $found -eq 0 ]; then
-	mkdir -p $graphicsDir/ReadyToProcess/$sub/uncropped_T1/front;
-	mkdir -p $graphicsDir/ReadyToProcess/$sub/uncropped_T1/top;
-	mkdir -p $graphicsDir/ReadyToProcess/$sub/uncropped_T1/side;
-	mkdir -p $graphicsDir/ReadyToProcess/$sub/MoreImages_3D;
-	mv ${antDir}/tmp/anat.nii.gz $graphicsDir/ReadyToProcess/$sub/HighRes.nii.gz 
-	cp ${antDir}/${antPre}ExtractedBrain0N4.nii.gz $graphicsDir/ReadyToProcess/$sub/c1HighRes.nii.gz 
+	mkdir -p $graphicsDir/Brain_Images/ReadyToProcess/DMHDS$sub/uncropped_T1/front;
+	mkdir -p $graphicsDir/Brain_Images/ReadyToProcess/DMHDS$sub/uncropped_T1/top;
+	mkdir -p $graphicsDir/Brain_Images/ReadyToProcess/DMHDS$sub/uncropped_T1/side;
+	mkdir -p $graphicsDir/Brain_Images/ReadyToProcess/DMHDS$sub/MoreImages_3D;
+	mv ${antDir}/tmp/anat.nii.gz $graphicsDir/Brain_Images/ReadyToProcess/DMHDS$sub/HighRes.nii.gz 
+	#cp ${antDir}/${antPre}ExtractedBrain0N4.nii.gz $graphicsDir/Brain_Images/ReadyToProcess/DMHDS$sub/c1HighRes.nii.gz # switching to using SPM segment instead
 fi
 
 ### copy files for vis check
-cp ${QADir}/anat.BrainExtractionCheckAxial.png $TOPDIR/Graphics/Data_Check/NewPipeline/anat.BrainExtractionCheckAxial/$sub.png
-cp ${QADir}/anat.BrainExtractionCheckSag.png $TOPDIR/Graphics/Data_Check/NewPipeline/anat.BrainExtractionCheckSag/$sub.png
-cp ${QADir}/anat.antCTCheck.png $TOPDIR/Graphics/Data_Check/NewPipeline/anat.antCTCheck/$sub.png
+cp ${QADir}/anat.BrainExtractionCheckAxial.png $graphicsDir/Data_Check/NewPipeline/anat.BrainExtractionCheckAxial/DMHDS$sub.png
+cp ${QADir}/anat.BrainExtractionCheckSag.png $graphicsDir/Data_Check/NewPipeline/anat.BrainExtractionCheckSag/DMHDS$sub.png
+cp ${QADir}/anat.antCTCheck.png $graphicsDir/Data_Check/NewPipeline/anat.antCTCheck/DMHDS$sub.png
 
 #cleanup
 #mv highRes_* antCT/ #pipeNotes: add more deletion and clean up to minimize space, think about deleting Freesurfer and some of SUMA output
 # # # # leave this out for now until completely finished with testing!
-rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject* ${subDir}/dimon.files* ${subDir}/GERT_Reco* 
+rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject* 
 rm -r ${antDir}/tmp ${freeDir}/SUMA/${sub}_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.*
 gzip ${freeDir}/SUMA/*.nii 
 
  
 # -- BEGIN POST-USER -- 
-echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 
-mv $HOME/$JOB_NAME.$JOB_ID.out $antDir/$JOB_NAME.$JOB_ID.out	 
+echo "----JOB [$SLURM_JOB_ID] STOP [`date`]----" 
+mv /dscrhome/$USER/anat_DBIS.$SLURM_JOB_ID.out $antDir/anat_DBIS.$SLURM_JOB_ID.out 
 # -- END POST-USER -- 

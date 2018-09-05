@@ -1,54 +1,27 @@
-%-----------------------------------------------------------------------
-% SPM BATCH SETUP
-%
-%    The Laboratory of Neurogenetics, 2015
-%       By Annchen Knodt, Duke University
-%       Vanessa Sochat, Duke University
-%       Patrick Fisher, University of Pittsburgh
-%
-% Change log:
-%       10/26/15: Adapted from DNS pipeline
-%
-%-----------------------------------------------------------------------
+%% SPM FIELDMAP
+%% When creating pipeline2.0, we decided that SPM did the best fieldmap correction
+%% 6/26/18: when we adapted the pipeline to the DCC / BIDS format, somehow the fieldmap correction got reversed!
+%%	We really don't know why this happened, but since changing blipdir (presubphasemag module) from 1 to -1 solves the issue and results in results practically identical to previous, we will just go with it!
+%%  As a result, the resulting field map (vdm5) image is the inverse of what it was before.
+%%  Also, the vdm5 image has additional features outside the front of the brain that weren't there before (maybe they were masked or soemthign?) and this is perhaps why the resulting epi isn't 100% identical to before, but it shouldn't really matter!
 
-% % Suppress 'beep.m' name confict warning, beware that this might suppress something relevant!!
-% warning('off', 'MATLAB:dispatcher:nameConflict');
-% fprintf('\n**Note: MATLAB:dispatcher:nameConflict warnings have been suppressed**\n');
-
-% % Add necessary paths for BIAC, then SPM and data folders
-spmPath = '/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Scripts/Tools/spm12'; addpath(genpath(spmPath));
+spmPath = '/cifs/hariri-long/Scripts/Tools/spm12'; addpath(genpath(spmPath));
 
 %Here we set some directory variables to make navigation easier
-homedir='SUB_TMPOUTDIR_SUB'; 
-datadir='/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/';
+homedir='SUB_OUTDIR_SUB'; 
+datadir='/cifs/hariri-long/Studies/DBIS/Imaging/sourcedata/sub-SUB_SUBJECT_SUB/fmap';
 
 % spm('defaults','fmri');spm_jobman('initcfg');                               % Initialize SPM JOBMAN
 
 
 %% IMPORT FIELDMAP
-% Get DICOM images and run import
-images=dir(fullfile(datadir,'/SUB_SUBJECT_SUB/DMHDS/MR_gre_field_mapping_2mm/*.dcm')); numimages = length(images);
-if(length(images)>0)
-    for j=1:numimages; imagearray{j}=[datadir '/SUB_SUBJECT_SUB/DMHDS/MR_gre_field_mapping_2mm/' images(j).name]; end;
-    matlabbatch{1}.spm.util.dicom.data = imagearray;
-    matlabbatch{1}.spm.util.dicom.root = 'flat';
-    matlabbatch{1}.spm.util.dicom.outdir = {[homedir]};
-    matlabbatch{1}.spm.util.dicom.convopts.format = 'nii';
-    matlabbatch{1}.spm.util.dicom.convopts.icedims = 0;
-    clear imagearray;
-    spm_jobman('run',matlabbatch);  clear matlabbatch
-
-    % change the name to make it easier to work with. 
-    % there should be 3 sDMHDS*.nii files!  typically 0006...01 & 02.nii and 0007...02.nii
-    % the first 2 are magnitude images, and the first should have the shorter echo
-    % the third is the phase difference image, calculated by the scanner
-    images=dir([homedir '/s*nii']);
-    fprintf('***Renaming %s to magnitude_image_1.nii***\n',images(1).name);
-    movefile([homedir '/' images(1).name],[homedir '/magnitude_image_1.nii']);
-    fprintf('***Deleting magnitude_image_2 file %s***\n',images(2).name);
-    delete([homedir '/' images(2).name]);
-    fprintf('***Renaming %s to phase_dif.nii***\n',images(3).name);
-    movefile([homedir '/' images(3).name],[homedir '/phase_dif.nii']);
+% there are 3 fieldmap "run" files
+% the first 2 are magnitude images, and the first should have the shorter echo
+% the third is the phase difference image, calculated by the scanner
+if(exist([datadir '/sub-SUB_SUBJECT_SUB_magnitude1.nii.gz'])&&exist([datadir '/sub-SUB_SUBJECT_SUB_magnitude2.nii.gz'])&&exist([datadir '/sub-SUB_SUBJECT_SUB_phasediff.nii.gz']))
+	copyfile([datadir '/*.nii.gz'],homedir);
+	gunzip([homedir '/sub-SUB_SUBJECT_SUB_magnitude*.nii.gz' ]);
+	gunzip([homedir '/sub-SUB_SUBJECT_SUB_phase*.nii.gz' ]);
 else
     fprintf('****Couldnt find fieldmap!!!****\n\n');
 end
@@ -56,12 +29,12 @@ end
 %% CALCULATE FIELDMAP
 gunzip([homedir '/tmp/epi_dt.nii.gz']);
 
-matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.phase = {[homedir '/phase_dif.nii,1']};
+matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.phase = {[homedir '/sub-SUB_SUBJECT_SUB_phasediff.nii,1']};
 % use first magnitude images since it is the shorter echo and shoud have better contrast
-matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.magnitude = {[homedir '/magnitude_image_1.nii,1']};
+matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.magnitude = {[homedir '/sub-SUB_SUBJECT_SUB_magnitude1.nii,1']};
 matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.defaults.defaultsval.et = [4.92 7.38];
 matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.defaults.defaultsval.maskbrain = 1;
-matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.defaults.defaultsval.blipdir = 1;  % ORIGINALLY USED -1
+matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.defaults.defaultsval.blipdir = -1;  % USED 1 on BIAC, but -1 on DCC / BIDS format
 matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.defaults.defaultsval.tert = 36.3;
 matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.defaults.defaultsval.epifm = 0;
 matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.defaults.defaultsval.ajm = 0;
@@ -88,7 +61,7 @@ spm_jobman('run',matlabbatch);  clear matlabbatch     %Execute the job and clear
 % Get V000 images
 for j=1:SUB_NUMTRS_SUB; imagearray{j}=sprintf('%s/tmp/epi_dt.nii,%d',homedir,j); end; 
 matlabbatch{1}.spm.spatial.realignunwarp.data.scans = imagearray;
-matlabbatch{1}.spm.spatial.realignunwarp.data.pmscan = {[homedir '/vdm5_scphase_dif.nii']};
+matlabbatch{1}.spm.spatial.realignunwarp.data.pmscan = {[homedir '/vdm5_scsub-SUB_SUBJECT_SUB_phasediff.nii']};
 matlabbatch{1}.spm.spatial.realignunwarp.eoptions.quality = 0.9;
 matlabbatch{1}.spm.spatial.realignunwarp.eoptions.sep = 4;
 matlabbatch{1}.spm.spatial.realignunwarp.eoptions.fwhm = 5;
@@ -140,12 +113,12 @@ else
 end
 
 %% clean up
-gzip([homedir '/vdm5_scphase_dif.nii']);
-delete([homedir '/vdm5_scphase_dif.nii']);
-delete([homedir '/magnitude_image_1.nii']); 
-delete([homedir '/phase_dif.nii']); 
-delete([homedir '/fpm_scphase_dif.nii']);
-delete([homedir '/bmaskmagnitude_image_1.nii']);
-delete([homedir '/mmagnitude_image_1.nii']);
-delete([homedir '/scphase_dif.nii']);
+gzip([homedir '/vdm5_scsub-SUB_SUBJECT_SUB_phasediff.nii']);
+delete([homedir '/vdm5_scsub-SUB_SUBJECT_SUB_phasediff.nii']);
+delete([homedir '/sub-SUB_SUBJECT_SUB_magnitude*.nii*']); 
+delete([homedir '/sub-SUB_SUBJECT_SUB_phasediff.nii*']); 
+delete([homedir '/fpm_scsub-SUB_SUBJECT_SUB_phasediff.nii']);
+delete([homedir '/bmasksub-SUB_SUBJECT_SUB_magnitude1.nii']);
+delete([homedir '/msub-SUB_SUBJECT_SUB_magnitude1.nii']);
+delete([homedir '/scsub-SUB_SUBJECT_SUB_phasediff.nii']);
 

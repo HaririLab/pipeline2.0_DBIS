@@ -25,33 +25,40 @@
 #3) Bo unwarping, consider using epi_reg approach https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=fsl;6b6c4ba1.1404
 
 # --- BEGIN GLOBAL DIRECTIVE -- 
-#$ -o $HOME/$JOB_NAME.$JOB_ID.out
-#$ -e $HOME/$JOB_NAME.$JOB_ID.out
-#$ -l h_vmem=16G 
-# -- END GLOBAL DIRECTIVE -- 
+#SBATCH --output=/dscrhome/%u/epi_minProc_DBIS.%j.out 
+#SBATCH --error=/dscrhome/%u/epi_minProc_DBIS.%j.out 
+# SBATCH --mail-user=%u@duke.edu
+# SBATCH --mail-type=END
+#SBATCH --mem=16000 # max is 64G on common partition, 64-240G on common-large
+# -- END GLOBAL DIRECTIVE -
 
-sub=$1 #$1 or flag -s  #20161103_21449 #pipenotes= Change away from HardCoding later 
+source ~/.bash_profile
+
+sub=$1 # use just 4 digit number! E.g 0234 for DMHDS0234
 task=$2
-scriptDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
-subDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
-QADir=${subDir}/QA
-outDir=${subDir}/${task}
-tmpOutDir=$TMPDIR
-tmpDir=${tmpOutDir}/tmp
-antDir=${subDir}/antCT
-freeDir=${subDir}/FreeSurfer
-antPre="highRes_"
-templateDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Analysis/Templates #pipenotes= update/Change away from HardCoding later
-templatePre=dunedin115template_MNI_ #pipenotes= update/Change away from HardCoding later
-#T1=$2 #/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
 threads=$3
+
+TOPDIR=/cifs/hariri-long
+scriptDir=$TOPDIR/Scripts/pipeline2.0_DBIS # using BASH_SOURCE doesn't work for cluster jobs bc they are saved as local copies to nodes
+imagingDir=$TOPDIR/Studies/DBIS/Imaging
+QADir=$imagingDir/derivatives/QA/sub-${sub}
+antDir=$imagingDir/derivatives/ANTs/sub-${sub}
+freeDir=$imagingDir/derivatives/freesurfer_v6.0/sub-${sub}
+outDir=$imagingDir/derivatives/epiMinProc_$task/sub-${sub}
+tmpDir=${outDir}/tmp
+antPre="highRes_"
+templateDir=$TOPDIR/Templates/DBIS/WholeBrain
+templatePre=dunedin115template_MNI_ #pipenotes= update/Change away from HardCoding later
+fieldMapDir=$imagingDir/sourcedata/fmap/sub-${sub}
+graphicsDir=$TOPDIR/Studies/DBIS/Graphics/Brain_Images/
 if [ ${#threads} -eq 0 ]; then threads=1; fi 
-fieldMapDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_gre_field_mapping_2mm/
-export PATH=$PATH:$scriptDir/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
+export PATH=$PATH:${scriptDir}/:${scriptDir/DBIS/common}/:${scriptDir}/utils/  #DCCnotes: do this all in bash_profile?
+
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
 export OMP_NUM_THREADS=$threads
 
-echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]----"
+echo "----JOB [$SLURM_JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]----"
+echo "----CALL: $0 $@----"
 
 # # ##Make sure anatomical has been run
 # # if [ ! -e ${antDir}/${antPre}BrainSegmentation.nii.gz ]; then
@@ -64,19 +71,14 @@ echo "----JOB [$JOB_NAME.$JOB_ID] SUBJ $sub START [`date`] on HOST [$HOSTNAME]--
 ##Grab Epi and set up directories
 
 if [[ $task == "faces" ]];then
-	epiDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_matching
 	expLen=200
 elif [[ $task == "mid" ]];then
-	epiDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_quick_strike
 	expLen=232
 elif [[ $task == "stroop" ]];then
-	epiDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_colours
 	expLen=209
 elif [[ $task == "facename" ]];then
-	epiDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_name_game
 	expLen=172
 elif [[ $task == "rest" ]];then
-	epiDir=/mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_ep2d_bold_moco_p2s3_resting_state
 	expLen=248
 else
 		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -86,53 +88,30 @@ else
 		exit
 fi
 
-##Set up directory
-mkdir -p $QADir
-mkdir $tmpDir
-cd $tmpOutDir
+epiRaw=$(ls $imagingDir/sourcedata/sub-$sub/func/sub-${sub}_task-${task}*_bold.nii.gz | tail -1) # take second run if task was stopped and restarted
+json=$(ls $imagingDir/sourcedata/sub-$sub/func/sub-${sub}_task-${task}*_bold.json | tail -1) # take second run if task was stopped and restarted
 
-###Build Epi from DICOM
-Dimon -gert_to3d_prefix epi.nii.gz -infile_prefix ${epiDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset
-mv epi.nii.gz dimon* GERT* ${tmpDir}
-# # dcm2nii ${fieldMapDir}
-# # mv ${fieldMapDir}/*001.nii.gz ${tmpDir}
-# # bet ${tmpDir}/*1001.nii.gz ${tmpDir}/betMag.nii.gz
-# # fslmaths ${tmpDir}/betMag.nii.gz -ero ${tmpDir}/betMag_eroded.nii.gz #suggested by fsl to remove any possible noisy nonbrain, image will be interpolated anyway
-# # #use fsl_prepare_fieldmap and then epi_reg with field map
-# # fsl_prepare_fieldmap SIEMENS ${tmpDir}/*2001.nii.gz ${tmpDir}/betMag_eroded.nii.gz ${tmpDir}/fmap_rads 2.46
+##Set up directory
+rm -r $outDir # get rid of old runs if necessary
+mkdir -p $QADir
+mkdir -p $tmpDir
+cd $outDir
+
+# copy epi from sourcedata to working dir
+cp $epiRaw ${tmpDir}/epi.nii.gz
+
+###Check to make sure epi has correct number of TRs other exit and complain
 expLen2=$(echo "$expLen-1" | bc)
-###Check to make sure T1 has correct number of slices other exit and complain
 lenEpi=$(3dinfo -nv ${tmpDir}/epi.nii.gz)
+runCt=$(ls $imagingDir/sourcedata/sub-$sub/func/sub-${sub}*_task-${task}_bold.nii.gz | wc -l)
 if [[ $lenEpi == $expLen || $lenEpi == $expLen2 ]];then
-	echo "Epi matches the assumed length"
+	echo "Found $runCt Epi runs. The last (or only) run matches the assumed length"
 else
-	# check if this run was stopped and restarted, in which case teh GERT script will have 2 instances of "epi.nii.gz", and we can just edit it to be able to pull the latter
-	cd $tmpDir
-	runCt=`grep epi.nii.gz GERT_Reco_dicom | wc -l`;
-	if [[ $runCt == 2 ]]; then 
-		# need to edit the GERT_Reco script so that the two runs go to dif file names
-		sed -i '0,/epi.nii.gz/{s/epi.nii.gz/epi1.nii.gz/}' GERT_Reco_dicom; # change first instance
-		sed -i '0,/epi.nii.gz/{s/epi.nii.gz/epi2.nii.gz/}' GERT_Reco_dicom; # change second instance
-		sh GERT_Reco_dicom # now run Reco
-		lenEpi2=$(3dinfo -nv epi2.nii.gz)
-		if [[ $lenEpi2 == $expLen || $lenEpi2 == $expLen2 ]];then
-			echo "!!!!!!!!!!!!!!! Epi appears to have been re-run, and second run matches the assumed length. Proceeding !!!!!!!!!!!!"
-			mv epi2.nii.gz epi.nii.gz 
-			cd $tmpOutDir
-		else
-			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-			echo "!!!!!!!!!! EPI has wrong number of TRs! Detected 2 runs of length $lenEpi and $lenEpi2 !!!!!!!!!!!!!!!!!!!!!!!!"
-			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-			exit
-		fi
-	else
-		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-		echo "!!!!!!!!!!!!!!! EPI has wrong number of TRs! Detected $runCt runs, first is length $lenEpi !!!!!!!!!!!!!!!!!!!!"
-		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"	
-		exit
-	fi
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!! EPI has wrong number of TRs! Detected $runCt runs, last is length $lenEpi !!!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"	
+	exit
 fi
 
 echo ""
@@ -142,8 +121,10 @@ echo "##########################################################################
 echo ""
 ###Resample structural to voxel dimensions of epi for grid when applying warps
 3dDespike -prefix ${tmpDir}/epi_d.nii.gz ${tmpDir}/epi.nii.gz #citation:Jo et al., 2014 #pipeNotes: do we want to do this on tasks?? #citation: Kalcher et al., 2013. Example of despiking in task analysis...at least some people do this... #citation: also https://afni.nimh.nih.gov/afni/community/board/read.php?1,141185,143682#msg-143682, small comment "helpful, more important in rest than task" 
-3dTshift -tzero 0 -prefix ${tmpDir}/epi_dt.nii.gz ${tmpDir}/epi_d.nii.gz #perform t-shifting and shift times to begining of TR as suggested by afni "As the comment states, the goal is to resample each voxel time series so that it is as if each volume was acquired at the beginning of each TR.  That way the slice timing will accurately match the stimulus timing." #citation: https://afni.nimh.nih.gov/pub/dist/edu/data/CD.expanded/AFNI_data6/FT_analysis/tutorial/t10_tshift.txt
-# # 3dvolreg -base 0 -prefix ${tmpDir}/epi_dtv.nii.gz -zpad 1 -1Dfile ${outDir}/motion.1D ${tmpDir}/epi_dt.nii.gz # volume registation and extraction of motion trace
+# need to add -tpattern when adapting to BIDS format, bc the conversion to bids strips the slice timing information from the image header (which AFNI can read) and puts it in the json file instead
+grep -A72 SliceTiming $json | tail -72 | sed 's/,//g' | sed 's/]//' > ${outDir}/SliceTiming.txt
+3dTshift -tpattern @${outDir}/SliceTiming.txt -tzero 0 -prefix ${tmpDir}/epi_dt.nii.gz ${tmpDir}/epi_d.nii.gz #perform t-shifting and shift times to begining of TR as suggested by afni "As the comment states, the goal is to resample each voxel time series so that it is as if each volume was acquired at the beginning of each TR.  That way the slice timing will accurately match the stimulus timing." #citation: https://afni.nimh.nih.gov/pub/dist/edu/data/CD.expanded/AFNI_data6/FT_analysis/tutorial/t10_tshift.txt
+# # 3dvolreg -base 0 -prefix ${tmpDir}/epi_dtv.nii.gz -zpad 1 -1Dfile ${outDir}/motion.1D ${tmpDir}/epi_dt.nii.gz # volume registation and extraction of motion trace; this is now done in SPM as part of the fieldmap operation
 
 
 echo ""
@@ -157,11 +138,12 @@ echo ""
 for i in ${scriptDir}'/spm_fieldmap.m'; do
 sed -e 's@SUB_SUBJECT_SUB@'$sub'@g' \
 	-e 's@SUB_NUMTRS_SUB@'$expLen'@g' \
-	-e 's@SUB_TMPOUTDIR_SUB@'$tmpOutDir'@g' \
+	-e 's@SUB_OUTDIR_SUB@'$outDir'@g' \
 	-e 's@SUB_TASK_SUB@'$task'@g' <$i> spm_fieldmap.m
 done
 # run script
-/usr/local/bin/matlab -nodisplay < spm_fieldmap.m
+/opt/apps/matlabR2016a/bin/matlab -nodisplay -singleCompThread < spm_fieldmap.m
+
 # clean up
 rm ${tmpDir}/meanuepi_dt.nii
 gzip ${tmpDir}/wfmag_epi_dt.nii
@@ -196,7 +178,7 @@ robustfov -i ${tmpDir}/ExtractedBrain0N4_FSL.nii.gz
 ########################################### MAX START HERE ########################################################
 ##BBR register 
 epi_reg --epi=${tmpDir}/epi_dtvbmFSL.nii.gz --t1=${tmpDir}/BrainSegmentation0N4_FSL.nii.gz --t1brain=${tmpDir}/ExtractedBrain0N4_FSL.nii.gz --out=${tmpDir}/epi2highResBBR -v
-c3d_affine_tool -ref ${tmpDir}/ExtractedBrain0N4_FSL.nii.gz -src ${tmpDir}/epi_dtvbmFSL.nii.gz ${tmpDir}/epi2highResBBR.mat -fsl2ras -oitk ${tmpOutDir}/epi2highRes0GenericAffine.mat
+c3d_affine_tool -ref ${tmpDir}/ExtractedBrain0N4_FSL.nii.gz -src ${tmpDir}/epi_dtvbmFSL.nii.gz ${tmpDir}/epi2highResBBR.mat -fsl2ras -oitk ${outDir}/epi2highRes0GenericAffine.mat
 #3dTstat -prefix ${tmpDir}/epi2highResBBRmean.nii.gz ${tmpDir}/epi2highResBBR.nii.gz
 voxSize=$(@GetAfniRes ${tmpDir}/epi.nii.gz)
 3dresample -input ${templateDir}/${templatePre}Brain.nii.gz -dxyz 2 2 2 -prefix ${tmpDir}/refTemplate4epi.nii.gz ##Citation: Decided to switch to resample to 2mm iso after testing and showing that group activation maps are more robust and significant when this step is added
@@ -204,18 +186,18 @@ voxSize=$(@GetAfniRes ${tmpDir}/epi.nii.gz)
 ##Apply Warps #citation: https://github.com/stnava/ANTs/wiki/antsCorticalThickness-and-antsLongitudinalCorticalThickness-output and https://github.com/maxwe128/restTools/blob/master/preprocessing/norm.func.spm12sa.csh 
 
 
-antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiWarpedMean.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${tmpOutDir}/epi2highRes0GenericAffine.mat -n Bspline #At first Bspline looked best but we switched back to Linear because of marked improvements in tSNR maps in linear compared to Bspline compared to oldSPM methods
-antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiMean2highRes.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${tmpOutDir}/epi2highRes0GenericAffine.mat -n Linear
-antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtv.nii.gz -o ${tmpOutDir}/epiWarped.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${tmpOutDir}/epi2highRes0GenericAffine.mat -n Bspline 
-3drefit -space MNI -view tlrc ${tmpOutDir}/epiWarped.nii.gz #Refit space of warped epi so that it can be viewed in MNI space within AFNI
+antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiWarpedMean.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${outDir}/epi2highRes0GenericAffine.mat -n Bspline #At first Bspline looked best but we switched back to Linear because of marked improvements in tSNR maps in linear compared to Bspline compared to oldSPM methods
+antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiMean2highRes.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${outDir}/epi2highRes0GenericAffine.mat -n Linear
+antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtv.nii.gz -o ${outDir}/epiWarped.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${outDir}/epi2highRes0GenericAffine.mat -n Bspline 
+3drefit -space MNI -view tlrc ${outDir}/epiWarped.nii.gz #Refit space of warped epi so that it can be viewed in MNI space within AFNI
 
 #####Smooth Data 6mm will get output to about 11-13 FWHM on average
 if [[ $task != "rest" ]];then
 	##Smooth
-	3dBlurInMask -input ${tmpOutDir}/epiWarped.nii.gz -mask ${templateDir}/${templatePre}BrainExtractionMask_2mmDil1.nii.gz -FWHM 6 -prefix ${tmpDir}/epiWarped_blur6mm.nii.gz ##comments: Decided again a more restricted blur in mask with different compartments for cerebellum etc, because that approach seemed to be slighly harming tSNR actually and did not help with peak voxel or extent analyses when applied to Faces contrast. Decided to use a dilated Brain Extraction mask because this at least gets rid of crap that is way outside of brain. This saves space (slightly) and aids with cleaner visualizations. A GM mask can still later be applied for group analyses, this way we at least leave that up to the user.
+	3dBlurInMask -input ${outDir}/epiWarped.nii.gz -mask ${templateDir}/${templatePre}BrainExtractionMask_2mmDil1.nii.gz -FWHM 6 -prefix ${tmpDir}/epiWarped_blur6mm.nii.gz ##comments: Decided again a more restricted blur in mask with different compartments for cerebellum etc, because that approach seemed to be slighly harming tSNR actually and did not help with peak voxel or extent analyses when applied to Faces contrast. Decided to use a dilated Brain Extraction mask because this at least gets rid of crap that is way outside of brain. This saves space (slightly) and aids with cleaner visualizations. A GM mask can still later be applied for group analyses, this way we at least leave that up to the user.
 	##Scale: We do not scale rest at all (i.e. even in the next step rest_DNS), because it shouldn't matter for connectivity analysis, and at first we weren't too sure of the appropriate way to do so. May want to change this later though.
 	3dTstat -prefix ${tmpDir}/mean.epiWarped_blur6mm.nii.gz ${tmpDir}/epiWarped_blur6mm.nii.gz
-	3dcalc -a ${tmpDir}/epiWarped_blur6mm.nii.gz -b ${tmpDir}/mean.epiWarped_blur6mm.nii.gz -expr 'min(200, a/b*100)*step(a)*step(b)' -prefix ${tmpOutDir}/epiWarped_blur6mm.nii.gz ##pipenotes: this is scaling all values to have comparaple beta weights across subjects. Make sure to indicate in wiki entry that the unblurred data is not scaled!!!! Also the scaling was motivated by this post #citation: https://afni.nimh.nih.gov/pub/dist/edu/data/CD.expanded/AFNI_data6/FT_analysis/tutorial/t14_scale.txt and is not being done for rest currently.  
+	3dcalc -a ${tmpDir}/epiWarped_blur6mm.nii.gz -b ${tmpDir}/mean.epiWarped_blur6mm.nii.gz -expr 'min(200, a/b*100)*step(a)*step(b)' -prefix ${outDir}/epiWarped_blur6mm.nii.gz ##pipenotes: this is scaling all values to have comparaple beta weights across subjects. Make sure to indicate in wiki entry that the unblurred data is not scaled!!!! Also the scaling was motivated by this post #citation: https://afni.nimh.nih.gov/pub/dist/edu/data/CD.expanded/AFNI_data6/FT_analysis/tutorial/t14_scale.txt and is not being done for rest currently.  
 fi
 
 echo ""
@@ -224,18 +206,18 @@ echo "###############Get Motion and QA vals and make Aligment Montage for Visual
 echo "#########################################################################################################"
 echo ""
 ######Calculation of motion, DVARs, alignment correlation and plots to have for censoring and QC
-# Note that FD is also calculated in spm_fieldmap, per Power 2012, and output to ${tmpOutDir}/FD.1D. The values for this version tend to be a bit higher (making for stricter censoring) than those generated by FSL below (FD_FSL.1D). 
+# Note that FD is also calculated in spm_fieldmap, per Power 2012, and output to ${outDir}/FD.1D. The values for this version tend to be a bit higher (making for stricter censoring) than those generated by FSL below (FD_FSL.1D). 
 # As such we ended up using FD.1D for task censoring, but FD_FSL.1D for rest, where we use a much lower censoring threshold.
 #Calculate FD, #citation: Power et al., 2012 
-fsl_motion_outliers -i ${tmpDir}/epi_dt.nii.gz -o ${tmpDir}/conf -s ${tmpOutDir}/FD_FSL.1D --fd #Use fsl tools because the automatically do it the same as Power 2012 #citation: https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FSLMotionOutliers
-fsl_motion_outliers --nomoco --dvars -m ${tmpDir}/epi_ExtractionMask.nii.gz -o ${tmpDir}/tempConf -s fslDVARS.1D -i tmp/epi_dtvb.nii.gz #calc FSL style for the purpose of comparison #pipenotes: might want to remove
+fsl_motion_outliers -i ${tmpDir}/epi_dt.nii.gz -o ${tmpDir}/conf -s ${outDir}/FD_FSL.1D --fd #Use fsl tools because the automatically do it the same as Power 2012 #citation: https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FSLMotionOutliers
+fsl_motion_outliers --nomoco --dvars -m ${tmpDir}/epi_ExtractionMask.nii.gz -o ${tmpDir}/tempConf -s ${outDir}/fslDVARS.1D -i ${tmpDir}/epi_dtvb.nii.gz #calc FSL style for the purpose of comparison #pipenotes: might want to remove
 #Caluclate DVARS #citation: Nichols, 2013
-DVARS.sh ${tmpDir}/epi_dtv.nii.gz ${tmpOutDir}/DVARS.1D  ##Use Tom Nichols standardized DVARs #pipenotes: here is one paper with a standardized DVARs threshold(1.8) #citation: https://pdfs.semanticscholar.org/8b64/7293808a4903e877f93d8241428b7596a909.pdf
+DVARS.sh ${tmpDir}/epi_dtv.nii.gz ${outDir}/DVARS.1D  ##Use Tom Nichols standardized DVARs #pipenotes: here is one paper with a standardized DVARs threshold(1.8) #citation: https://pdfs.semanticscholar.org/8b64/7293808a4903e877f93d8241428b7596a909.pdf
 #Calculate derivative of motion params for confound regression, #citation: Power et al., 2014
-1d_tool.py -infile ${tmpOutDir}/motion_spm_deg.1D -derivative -write ${tmpOutDir}/motion_deriv.1D
+1d_tool.py -infile ${outDir}/motion_spm_deg.1D -derivative -write ${outDir}/motion_deriv.1D
 #calculate TRs above threshold
-awk -v thresh=".25" '{if($1 > thresh) print NR}' ${tmpOutDir}/FD.1D > ${tmpOutDir}/FD.25TRs.1D #find TRs above threshold 
-awk -v thresh=".5" '{if($1 > thresh) print NR}' ${tmpOutDir}/FD.1D > ${tmpOutDir}/FD.5TRs.1D #find TRs above threshold 
+awk -v thresh=".25" '{if($1 > thresh) print NR}' ${outDir}/FD.1D > ${outDir}/FD.25TRs.1D #find TRs above threshold 
+awk -v thresh=".5" '{if($1 > thresh) print NR}' ${outDir}/FD.1D > ${outDir}/FD.5TRs.1D #find TRs above threshold 
 ###Make QC vals file, spatial correlations for each warp, and anything else from http://ccpweb.wustl.edu/pdfs/2013hcp2_barch.pdf
 
 ##Make QC/QA montages
@@ -243,19 +225,19 @@ awk -v thresh=".5" '{if($1 > thresh) print NR}' ${tmpOutDir}/FD.1D > ${tmpOutDir
 3dresample -input ${templateDir}/${templatePre}BrainExtractionMask.nii.gz -master ${tmpDir}/refTemplate4epi.nii.gz -prefix ${tmpDir}/refTemplateBrainMask.nii.gz
 #tSNR
 3dTstat -cvarinvNOD -prefix ${tmpDir}/tSNR.nii.gz ${tmpDir}/epi_dtvb.nii.gz #mean/temporal sd,  #citation: same as Marcus et al., 2013 tSNR
-3dTstat -cvarinvNOD -prefix ${tmpOutDir}/tSNR.EpiWarped.nii.gz ${tmpOutDir}/epiWarped.nii.gz #pipenotes: file can be used in futre to define group masks like in SPM if wanted
+3dTstat -cvarinvNOD -prefix ${outDir}/tSNR.EpiWarped.nii.gz ${outDir}/epiWarped.nii.gz #pipenotes: file can be used in futre to define group masks like in SPM if wanted
 tSNR=$(3dBrickStat -mask ${tmpDir}/epi_ExtractionMask.nii.gz ${tmpDir}/tSNR.nii.gz | sed "s/ *//g" | sed "s/\t\t*//g" )
 #smoothness before and after warping
 rawFWHM=$(3dFWHMx -mask ${tmpDir}/epi_ExtractionMask.nii.gz -combine ${tmpDir}/epi_dtvb.nii.gz | cut -d " " -f11 | sed "s/ *//g" | sed "s/\t\t*//g" )
-warpedFWHM=$(3dFWHMx -mask ${tmpDir}/refTemplateBrainMask.nii.gz -combine ${tmpOutDir}/epiWarped.nii.gz | cut -d " " -f11 | sed "s/ *//g" | sed "s/\t\t*//g" )
+warpedFWHM=$(3dFWHMx -mask ${tmpDir}/refTemplateBrainMask.nii.gz -combine ${outDir}/epiWarped.nii.gz | cut -d " " -f11 | sed "s/ *//g" | sed "s/\t\t*//g" )
 #Motion QC Measures
-nVols=$(3dinfo -nv ${tmpOutDir}/epiWarped.nii.gz)
-FDavg=$(1d_tool.py -show_mmms -infile ${tmpOutDir}/FD.1D | sed 's/ /,/g' | cut -d "," -f15 | sed '/^$/d')
-FDsd=$(1d_tool.py -show_mmms -infile ${tmpOutDir}/FD.1D | sed 's/ /,/g' | cut -d "," -f25 | sed '/^$/d')
-DVARSavg=$(1d_tool.py -show_mmms -infile ${tmpOutDir}/DVARS.1D | sed 's/ /,/g' | cut -d "," -f15 | sed '/^$/d')
-DVARSsd=$(1d_tool.py -show_mmms -infile ${tmpOutDir}/DVARS.1D | sed 's/ /,/g' | cut -d "," -f25 | sed '/^$/d')
-numCenFD25=$(cat ${tmpOutDir}/FD.25TRs.1D | wc -l)
-numCenFD50=$(cat ${tmpOutDir}/FD.5TRs.1D | wc -l)
+nVols=$(3dinfo -nv ${outDir}/epiWarped.nii.gz)
+FDavg=$(1d_tool.py -show_mmms -infile ${outDir}/FD.1D | sed 's/ /,/g' | cut -d "," -f15 | sed '/^$/d')
+FDsd=$(1d_tool.py -show_mmms -infile ${outDir}/FD.1D | sed 's/ /,/g' | cut -d "," -f25 | sed '/^$/d')
+DVARSavg=$(1d_tool.py -show_mmms -infile ${outDir}/DVARS.1D | sed 's/ /,/g' | cut -d "," -f15 | sed '/^$/d')
+DVARSsd=$(1d_tool.py -show_mmms -infile ${outDir}/DVARS.1D | sed 's/ /,/g' | cut -d "," -f25 | sed '/^$/d')
+numCenFD25=$(cat ${outDir}/FD.25TRs.1D | wc -l)
+numCenFD50=$(cat ${outDir}/FD.5TRs.1D | wc -l)
 FD25Per=$(echo "${numCenFD25}/${nVols}" | bc -l | cut -c1-5)
 FD50Per=$(echo "${numCenFD50}/${nVols}" | bc -l | cut -c1-5)
 #spatial correlations between epi and highres, epi and Template, and highRes and template as a crude index of alignment quality
@@ -279,7 +261,7 @@ ConvertScalarImageToRGB 3 ${tmpDir}/highRes2TemplateWarpedEdges.nii.gz ${tmpDir}
 3dcalc -a ${tmpDir}/highRes2TemplateEdgesRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/highRes2TemplateEdgesRBGstep.nii.gz #Make mask to make Edges stand out
 CreateTiledMosaic -i ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes2TemplateEdgesRBG.nii.gz -o ${QADir}/${task}.highRes2TemplateAlignmentCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes2TemplateEdgesRBGstep.nii.gz -f 0x1  #Create Montage taking images in axial slices every 5 slices
 ##epiWarpedMean to Template
-antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiWarpedMeanHR.nii.gz -r ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz  -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${tmpOutDir}/epi2highRes0GenericAffine.mat -n Linear
+antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiWarpedMeanHR.nii.gz -r ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz  -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${outDir}/epi2highRes0GenericAffine.mat -n Linear
 3dedge3 -input ${tmpDir}/epiWarpedMeanHR.nii.gz -prefix ${tmpDir}/epi2TemplateWarpedEdges.nii.gz  #Detect edges
 ConvertScalarImageToRGB 3 ${tmpDir}/epi2TemplateWarpedEdges.nii.gz ${tmpDir}/epi2TemplateEdgesRBG.nii.gz none red none 0 10 #convert for Ants Montage
 3dcalc -a ${tmpDir}/epi2TemplateEdgesRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/epi2TemplateEdgesRBGstep.nii.gz #Make mask to make Edges stand out
@@ -292,36 +274,23 @@ CreateTiledMosaic -i ${tmpDir}/epiPreb0.nii.gz -r ${tmpDir}/epiPreb0.nii.gz -o $
 CreateTiledMosaic -i ${tmpDir}/epiPostb0.nii.gz -r ${tmpDir}/epiPostb0.nii.gz -o ${QADir}/${task}.postB0.png -a 0 -t -1x-1 -d 2 -p mask -s [15,0,120] -x ${tmpDir}/epiPostb0.nii.gz -f 0x1 -p 0
 
 ### copy files for vis check
-cp ${QADir}/$task.epi2TemplateAlignmentCheck.png /mnt/BIAC/munin4.dhe.duke.edu/Hariri/DBIS.01/Graphics/Data_Check/NewPipeline/$task.epi2TemplateAlignmentCheck/$sub.png
+cp ${QADir}/$task.epi2TemplateAlignmentCheck.png $TOPDIR/Studies/DBIS/Graphics/Data_Check/NewPipeline/$task.epi2TemplateAlignmentCheck/DMHDS$sub.png
 
 ##Clean up
 rm -r $tmpDir
 
-##Now copy all files to the server using rsync for robustness
-mkdir -p $outDir
-rsync -r -v --stats --progress $tmpOutDir/* $outDir # check out -W option, --timeout
-returncode=$?
-##Doesn't always work the first time so check and try again if not
-ct=1
-while [[ $returncode -ne 0 ]] && [[ $ct -lt 5 ]]; do
-	echo rsync return code: $?
-	rsync -r -v --stats --progress $tmpOutDir/* $outDir # check out -W option, --timeout
-	returncode=$?
-	ct=$((ct+1))
-done
-
 ##run first level model
 if [ $task != "rest" ]; then
-	qsub $scriptDir/glm_$task.bash $sub
+	sbatch $scriptDir/glm_$task.sh $sub
 else
 	if [ ! -e $outDir/fslFD35/epiPrepped_blur6mm.nii.gz ]; then 
-		qsub $scriptDir/rest_DBIS.sh $sub
+		sbatch $scriptDir/rest_DBIS.sh $sub
 	fi
 fi
 
 # -- BEGIN POST-USER -- 
-echo "----JOB [$JOB_NAME.$JOB_ID] STOP [`date`]----" 
-mv $HOME/$JOB_NAME.$JOB_ID.out $outDir/$JOB_NAME.$JOB_ID.out	 
+echo "----JOB [$SLURM_JOB_ID] STOP [`date`]----" 
+mv /dscrhome/$USER/epi_minProc_DBIS.$SLURM_JOB_ID.out $outDir/epi_minProc_DBIS.$SLURM_JOB_ID.out 
 # -- END POST-USER -- 
 
 
