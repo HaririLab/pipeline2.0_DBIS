@@ -47,7 +47,7 @@ if [[ -e $OUTDIR/ResponseData.txt ]]; then
 			lineNum=$(grep -n $SUBJ $BehavioralFile | cut -d: -f1)
 			if [ $lineNum -gt 0 ]; then	sed -ci "${lineNum}d" $BehavioralFile; fi
 			vals=`awk '{print $2}' $OUTDIR/ResponseData.txt`
-			# # acc=$(grep AvgInconAcc $OUTDIR/ResponseData.txt | awk '{print $2}')
+			acc=$(grep AvgInconAcc $OUTDIR/ResponseData.txt | awk '{print $2}')
 			# # if [[ $(echo "$acc < .1" | bc ) -eq 1 ]]; then ok=0; else ok=1; fi		
 			# on 8/16/18 Ahmad decided that we wouldn't impose much of an accuracy threshold for the workhorse variables
 			# (it may come into play later when we are interested in effects related to successful trials)

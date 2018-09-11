@@ -7,6 +7,7 @@
 # SBATCH --mail-user=%u@duke.edu
 # SBATCH --mail-type=END
 #SBATCH --mem=12000 # max is 64G on common partition, 64-240G on common-large
+#SBATCH -p scavenger
 # -- END GLOBAL DIRECTIVE -- 
 SUBJ_NUM=$1 # use just 4 digit number! E.g 0234 for DMHDS0234
 fthr=0.5; dthr=2.5; # FD and DVARS thresholds
@@ -18,7 +19,7 @@ behavDir=$TOPDIR/Studies/DBIS/Imaging/ResponseData
 behavScript=$TOPDIR/Scripts/pipeline2.0_DBIS/behavioral/getFacesEprime.pl
 BehavioralFile=$TOPDIR/Database/DBIS/Imaging/x_x.KEEP.OUT.x_x/Behavioral_faces.csv
 MasterFile=$TOPDIR/Database/DBIS/Imaging/x_x.KEEP.OUT.x_x/fMRI_ROImeans_faces_${runname}.csv
-maskfile=$TOPDIR/Templates/DBIS/WB50/TAOStemplate_MNI_BrainExtractionMask.nii.gz
+maskfile=$TOPDIR/Templates/DBIS/WholeBrain/dunedin115template_MNI_BrainExtractionMask_2mmDil1.nii.gz
 lockDir=$TOPDIR/Database/DBIS/Imaging/x_x.KEEP.OUT.x_x/locks
 rdir=$TOPDIR/Templates/DBIS/Amygdala
 
