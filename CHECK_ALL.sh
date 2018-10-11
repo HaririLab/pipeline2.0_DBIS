@@ -25,6 +25,10 @@ qdir=$BASEDIR/Studies/DBIS/QA/DMHDS_images
 adir=$BASEDIR/Studies/DBIS/Imaging/derivatives
 ddir=$BASEDIR/Database/DBIS/Imaging/x_x.KEEP.OUT.x_x
 declare -A nROImeans; nROImeans[facename]=7; nROImeans[mid]=13; nROImeans[faces]=25; nROImeans[stroop]=5;
+export CIFTIFY_WORKDIR=/cifs/hariri-long/Studies/DBIS/Imaging/derivatives/ciftify
+
+# first make a backup copy of the  master inclusion file
+cp $incFile $masterDir/x_x.KEEP.OUT.x_x/LOGbackups/LOG_master_inclusion_list_bk_$(date | sed -e 's/ /_/g').csv
 
 bidsID=sub-${ID/DMHDS/} # this is the ID in new BIDS format, e.g. sub-1200
 if [[ $mode != list ]]; then	
@@ -97,7 +101,15 @@ if [[ $mode == list ]]; then
 	echo $output_str
 fi
 
-
+if [[ -e $CIFTIFY_WORKDIR/$bidsID/MNINonLinear/Native/MSMSulc/R.transformed_and_reprojected.func.gii ]]; then c1=1; else c1=0; fi #MSM ciftify recon all
+if [[ -e $CIFTIFY_WORKDIR/$bidsID/MNINonLinear/Results/GFC/GFC_Atlas_s0.dtseries.nii ]]; then c2=1; else c2=0; fi
+if [[ -e $CIFTIFY_WORKDIR/$bidsID/MNINonLinear/Results/GFC/GFC_Atlas_s0_Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR_meants.csv ]]; then c3=1; else c3=0; fi
+if [[ $mode != list ]]; then	
+	echo -e "  cifti.recon:\t $c1 \t.fmri: $c2 \t.parc: $c3"
+else
+	output_str="$output_str $c1 $c2 $c3"
+fi
+		
 ## update master inclusion file: 
 # cp from the files in the top directory rather within the KEEP.OUT directory because the latter are still being written to
 # use | tr -dc '[[:print:]]' to remove non-printing characters

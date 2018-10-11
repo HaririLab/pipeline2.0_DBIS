@@ -292,6 +292,11 @@ rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}Tem
 rm -r ${antDir}/tmp ${freeDir}/SUMA/${sub}_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.*
 gzip ${freeDir}/SUMA/*.nii 
 
+#Run ciftify once epi preprocessing complete
+while [[ ! -e $imagingDir/derivatives/epiMinProc_rest/sub-$sub/epiWarped.nii.gz || ! -e $imagingDir/derivatives/epiMinProc_facename/sub-$sub/epiWarped.nii.gz || ! -e $imagingDir/derivatives/epiMinProc_faces/sub-$sub/epiWarped.nii.gz || ! -e $imagingDir/derivatives/epiMinProc_mid/sub-$sub/epiWarped.nii.gz || ! -e $imagingDir/derivatives/epiMinProc_stroop/sub-$sub/epiWarped.nii.gz ]]; do
+	sleep 1h
+done
+sbatch $TOPDIR/Scripts/pipeline2.0_DBIS/ciftify_DBIS.sh sub-$sub
  
 # -- BEGIN POST-USER -- 
 echo "----JOB [$SLURM_JOB_ID] STOP [`date`]----" 

@@ -30,6 +30,7 @@
 # SBATCH --mail-user=%u@duke.edu
 # SBATCH --mail-type=END
 #SBATCH --mem=16000 # max is 64G on common partition, 64-240G on common-large
+#SBATCH -p scavenger
 # -- END GLOBAL DIRECTIVE -
 
 source ~/.bash_profile
@@ -281,10 +282,10 @@ rm -r $tmpDir
 
 ##run first level model
 if [ $task != "rest" ]; then
-	sbatch $scriptDir/glm_$task.sh $sub
+	sbatch -p scavenger $scriptDir/glm_$task.sh $sub
 else
 	if [ ! -e $outDir/fslFD35/epiPrepped_blur6mm.nii.gz ]; then 
-		sbatch $scriptDir/rest_DBIS.sh $sub
+		sbatch -p scavenger $scriptDir/rest_DBIS.sh $sub
 	fi
 fi
 
